@@ -2,7 +2,7 @@
 """
 BREAKOUT MATEMÁTICO  —  Pygame
 ==============================
-Releitura do Breakout (Atari, 1976) com questionários de matemática.
+Releitura do Breakout (Atari, 1976) com questionários de matemática e conhecimentos gerais.
 
 Como funciona
 -------------
@@ -12,7 +12,7 @@ Como funciona
   de um dos 10 questionários (Aritmética, Tabuada, Divisão, Porcentagem,
   Equações, Potências e Raízes, Frações, Expressões, Sequências, Problemas).
 - Acertou: ganha o boost da cápsula + pontos bônus (quanto mais rápido, mais pontos).
-- Errou ou o tempo acabou: a raquete encolhe por alguns segundos.
+- Errou ou o tempo acabou: recebe um downgrade temporário.
 - A dificuldade das questões e a velocidade da bola aumentam a cada nível.
 
 Controles
@@ -21,7 +21,8 @@ Controles
   ESPAÇO / clique ......... lançar a bola / disparar laser
   1 2 3 4 / clique ........ responder o questionário
   P ou ESC ................ pausar
-  ENTER ................... iniciar / reiniciar
+    1 / 2 / 3 ............... selecionar matemática / conhecimentos gerais / ambos no menu
+    ENTER ................... iniciar / reiniciar
 
 Requisito:  pip install pygame
 Executar:   python breakout_matematico.py
@@ -38,10 +39,10 @@ import pygame
 # ---------------------------------------------------------------------------
 # Configurações gerais
 # ---------------------------------------------------------------------------
-LARGURA, ALTURA = 960, 720
+LARGURA, ALTURA = 1280, 720
 FPS = 60
 TOPO_HUD = 64
-LARG_RAQUETE = 120
+LARG_RAQUETE = 160
 CHANCE_DROP = 0.22
 MAX_DROPS = 3
 
@@ -70,7 +71,11 @@ BOOSTS = {
     "X2": {"nome": "Pontos x2", "cor": (235, 235, 235), "icone": "x2", "dur": 15, "desc": "Pontuação em dobro"},
 }
 PESOS_BOOST = {"LARGA": 3, "MULTI": 3, "LENTA": 2, "VIDA": 1, "FOGO": 2, "IMA": 2, "LASER": 2, "X2": 2}
-PENALIDADE = {"nome": "Raquete Encolhida", "cor": (130, 130, 130), "icone": "-", "dur": 8}
+DOWNGRADES = {
+    "ENCOLHE": {"nome": "Raquete Encolhida", "cor": (130, 130, 130), "icone": "-", "dur": 8},
+    "RAQUETE_LENTA": {"nome": "Raquete Lenta", "cor": (220, 150, 90), "icone": "L", "dur": 8},
+    "BOLA_RAPIDA": {"nome": "Bola Acelerada", "cor": (240, 90, 90), "icone": "!", "dur": 8},
+}
 
 
 # ---------------------------------------------------------------------------
@@ -265,9 +270,82 @@ QUESTIONARIOS = {
 }
 
 
-def sortear_pergunta(nivel, evitar=None):
-    categorias = [c for c in QUESTIONARIOS if c != evitar]
-    return QUESTIONARIOS[random.choice(categorias)](nivel)
+QUESTIONARIOS_GERAIS = {
+    "Geografia": [
+        ("Qual é a capital da Austrália?", "Canberra", ["Sydney", "Melbourne", "Perth"]),
+        ("Qual é o maior estado brasileiro em área?", "Amazonas", ["Pará", "Mato Grosso", "Minas Gerais"]),
+        ("Qual é o maior oceano da Terra?", "Oceano Pacífico", ["Oceano Atlântico", "Oceano Índico", "Oceano Ártico"]),
+        ("Qual rio é tradicionalmente associado ao Egito?", "Rio Nilo", ["Rio Amazonas", "Rio Danúbio", "Rio Ganges"]),
+        ("Qual é a capital do Japão?", "Tóquio", ["Osaka", "Quioto", "Hiroshima"]),
+        ("Qual é o maior deserto do mundo?", "Antártida", ["Saara", "Gobi", "Atacama"]),
+        ("Em qual cordilheira fica o Monte Everest?", "Himalaia", ["Andes", "Alpes", "Montanhas Rochosas"]),
+        ("Qual país tem formato de uma bota e fica no sul da Europa?", "Itália", ["Grécia", "Portugal", "Croácia"]),
+    ],
+    "Ciências": [
+        ("Qual é a fórmula química da água?", "H₂O", ["CO₂", "O₂", "NaCl"]),
+        ("Qual planeta é conhecido como planeta vermelho?", "Marte", ["Vênus", "Júpiter", "Mercúrio"]),
+        ("Qual gás as plantas absorvem principalmente na fotossíntese?", "Dióxido de carbono", ["Oxigênio", "Hidrogênio", "Hélio"]),
+        ("Qual é a unidade de medida da corrente elétrica?", "Ampere", ["Volt", "Watt", "Ohm"]),
+        ("Qual é o símbolo químico do ouro?", "Au", ["Ag", "Fe", "O"]),
+        ("Qual gás é mais abundante na atmosfera terrestre?", "Nitrogênio", ["Oxigênio", "Dióxido de carbono", "Hidrogênio"]),
+        ("Quantas câmaras tem o coração humano?", "Quatro", ["Duas", "Três", "Cinco"]),
+        ("A que temperatura a água congela ao nível do mar?", "0 °C", ["-10 °C", "10 °C", "32 °C"]),
+        ("Qual é a unidade de medida de força no Sistema Internacional?", "Newton", ["Joule", "Pascal", "Watt"]),
+        ("Qual destes animais é um mamífero?", "Golfinho", ["Tubarão", "Polvo", "Truta"]),
+    ],
+    "História": [
+        ("Em que ano foi proclamada a Independência do Brasil?", "1822", ["1500", "1889", "1922"]),
+        ("Em que ano foi abolida a escravidão no Brasil?", "1888", ["1822", "1850", "1889"]),
+        ("Em que ano terminou a Segunda Guerra Mundial?", "1945", ["1918", "1939", "1950"]),
+        ("Qual cidade-estado grega é associada ao nascimento da democracia?", "Atenas", ["Esparta", "Corinto", "Tebas"]),
+        ("Em que ano os portugueses chegaram ao território que hoje é o Brasil?", "1500", ["1492", "1530", "1600"]),
+        ("Em que ano começou a Revolução Francesa?", "1789", ["1689", "1815", "1848"]),
+        ("Qual civilização construiu Machu Picchu?", "Inca", ["Maia", "Asteca", "Olmeca"]),
+        ("Quem foi o primeiro ser humano a pisar na Lua?", "Neil Armstrong", ["Yuri Gagarin", "Buzz Aldrin", "Alan Shepard"]),
+    ],
+    "Cultura": [
+        ("Quem pintou a Mona Lisa?", "Leonardo da Vinci", ["Michelangelo", "Vincent van Gogh", "Pablo Picasso"]),
+        ("Quem escreveu o romance Dom Casmurro?", "Machado de Assis", ["José de Alencar", "Clarice Lispector", "Carlos Drummond de Andrade"]),
+        ("Qual é o idioma oficial do Brasil?", "Português", ["Espanhol", "Francês", "Italiano"]),
+        ("Qual instrumento musical tem teclas, cordas e martelos?", "Piano", ["Flauta", "Trompete", "Violino"]),
+        ("Quem criou a personagem Harry Potter?", "J. K. Rowling", ["Suzanne Collins", "C. S. Lewis", "Agatha Christie"]),
+        ("Qual estilo musical brasileiro está ligado ao desfile de escolas no Carnaval?", "Samba", ["Fado", "Tango", "Flamenco"]),
+        ("Quantos anéis aparecem no símbolo dos Jogos Olímpicos?", "Cinco", ["Quatro", "Seis", "Sete"]),
+        ("Qual destes instrumentos pertence à família das cordas?", "Violão", ["Clarinete", "Trombone", "Tímpano"]),
+    ],
+}
+MATERIAS_QUIZ = ("Matemática", *QUESTIONARIOS_GERAIS)
+
+
+def _pergunta_textual(categoria, enunciado, correta, distratores):
+    opcoes = list(dict.fromkeys([correta, *distratores]))
+    while len(opcoes) < 4:
+        alternativa = f"Outra resposta {len(opcoes)}"
+        if alternativa not in opcoes:
+            opcoes.append(alternativa)
+    random.shuffle(opcoes)
+    resposta = correta
+    return {"categoria": categoria, "enunciado": enunciado, "opcoes": opcoes,
+            "indice_correto": opcoes.index(resposta), "resposta": resposta}
+
+
+def sortear_pergunta(nivel, evitar=None, materias=None):
+    selecionadas = set(materias or ("Matemática",))
+    opcoes = []
+    for materia in MATERIAS_QUIZ:
+        if materia not in selecionadas:
+            continue
+        if materia == "Matemática":
+            opcoes.extend(QUESTIONARIOS.items())
+        else:
+            opcoes.append((materia, None))
+    if not opcoes:
+        opcoes = list(QUESTIONARIOS.items())
+    disponiveis = [opcao for opcao in opcoes if opcao[0] != evitar] or opcoes
+    categoria, gerador = random.choice(disponiveis)
+    if gerador is not None:
+        return gerador(nivel)
+    return _pergunta_textual(categoria, *random.choice(QUESTIONARIOS_GERAIS[categoria]))
 
 
 # ---------------------------------------------------------------------------
@@ -416,9 +494,10 @@ class Bola:
 
 
 class Bloco:
-    def __init__(self, rect, cor, pontos, hp):
+    def __init__(self, rect, cor, pontos, hp, tipo="normal"):
         self.rect, self.cor, self.pontos = rect, cor, pontos
         self.hp = self.hp_max = hp
+        self.tipo = tipo
 
 
 class Drop:
@@ -456,16 +535,39 @@ class TextoFlutuante:
         self.vida = 1.4
 
 
-def criar_blocos(nivel):
+def criar_blocos(nivel, modo="padrao", dificuldade="normal"):
     linhas, colunas, gap, margem = 8, 14, 4, 40
     larg = (LARGURA - 2 * margem - gap * (colunas - 1)) / colunas
     alt, y0 = 22, TOPO_HUD + 50
     padrao = (nivel - 1) % 5
+    ajustes = {"facil": {"densidade": 0.62, "vida_extra": 0, "hazards": (3, 2)},
+               "normal": {"densidade": 0.74, "vida_extra": 0, "hazards": (4, 3)},
+               "dificil": {"densidade": 0.86, "vida_extra": 1, "hazards": (5, 4)}}
+    ajuste = ajustes[dificuldade]
+    procedural = random.randrange(5) if modo == "random" else None
     blocos = []
     for r in range(linhas):
         cor, pts = LINHAS_ATARI[r]
         for c in range(colunas):
-            if padrao == 0:
+            if procedural is not None:
+                chance = ajuste["densidade"]
+                x_norm = (c - (colunas - 1) / 2) / (colunas / 2)
+                y_norm = r / (linhas - 1)
+                if procedural == 0:
+                    ligado = random.random() < chance
+                elif procedural == 1:
+                    ligado = (x_norm * x_norm + (y_norm - 0.45) ** 2 < 0.95
+                              and random.random() < min(1.0, chance + 0.12))
+                elif procedural == 2:
+                    ligado = ((r + c + random.randint(0, 1)) % 3 != 0
+                              and random.random() < chance + 0.15)
+                elif procedural == 3:
+                    faixa = (r + random.randint(0, 2)) % 4 != 0
+                    ligado = faixa and random.random() < min(1.0, chance + 0.1)
+                else:
+                    ligado = (abs(c - random.randint(2, colunas - 3)) <= (linhas - r) * 0.9
+                              and random.random() < min(1.0, chance + 0.2))
+            elif padrao == 0:
                 ligado = True
             elif padrao == 1:
                 ligado = (r + c) % 2 == 0 or r < 2
@@ -475,15 +577,25 @@ def criar_blocos(nivel):
                 ligado = not (3 <= c <= 10 and 2 <= r <= 5)
             else:
                 ligado = random.random() < 0.75
+            rect = pygame.Rect(int(margem + c * (larg + gap)), int(y0 + r * (alt + gap)), int(larg), alt)
             if not ligado:
+                if procedural is not None:
+                    tipo = random.choices(("obstaculo", "bomba"), weights=ajuste["hazards"])[0]
+                    if tipo == "obstaculo":
+                        blocos.append(Bloco(rect, (125, 130, 145), 0, 1, "obstaculo"))
+                    elif tipo == "bomba":
+                        blocos.append(Bloco(rect, (225, 75, 55), 0, 1, "bomba"))
                 continue
             hp = 1
             if nivel >= 2 and r < 2:
                 hp = 2
             if nivel >= 4:
                 hp = 3 if r < 2 else (2 if r < 4 else 1)
-            rect = pygame.Rect(int(margem + c * (larg + gap)), int(y0 + r * (alt + gap)), int(larg), alt)
+            hp = min(4, hp + ajuste["vida_extra"] + (1 if modo == "random" and nivel >= 3 and r < 2 else 0))
             blocos.append(Bloco(rect, cor, pts, hp))
+    if not any(bl.tipo == "normal" for bl in blocos):
+        rect = pygame.Rect(LARGURA // 2 - 30, y0, 60, alt)
+        blocos.append(Bloco(rect, LINHAS_ATARI[0][0], LINHAS_ATARI[0][1], 1 + ajuste["vida_extra"]))
     return blocos
 
 
@@ -495,7 +607,7 @@ class Jogo:
         pygame.mixer.pre_init(22050, -16, 1, 512)
         pygame.init()
         self.tela = pygame.display.set_mode((LARGURA, ALTURA))
-        pygame.display.set_caption("Breakout Matemático")
+        pygame.display.set_caption("Breakout Genius")
         self.relogio = pygame.time.Clock()
         self.f_mini = fonte(15, True)
         self.f_peq = fonte(18)
@@ -506,9 +618,33 @@ class Jogo:
         self.sons = Sons()
         self.fundo = criar_fundo()
         self.recorde = carregar_recorde()
+        self.materias_selecionadas = {"Matemática"}
+        self.modo_jogo = "padrao"
+        self.dificuldade = "normal"
+        self.foco_modo = 0
+        self.foco_dificuldade = 1
+        self.foco_materia = 0
+        self.foco_confirmar = False
         self.usar_mouse = False
         self.tempo = 0.0
         self.opcoes_rects = []
+        self.botao_jogar_rect = pygame.Rect(LARGURA // 2 - 130, 650, 260, 48)
+        self.modos_jogo_rects = [
+            (pygame.Rect(LARGURA // 2 - 220 + i * 240, 320, 210, 90), modo, nome)
+            for i, (modo, nome) in enumerate((("padrao", "Padrão"), ("random", "Random")))
+        ]
+        self.dificuldades_rects = [
+            (pygame.Rect(LARGURA // 2 - 330 + i * 220, 320, 200, 72), dificuldade, nome)
+            for i, (dificuldade, nome) in enumerate((
+                ("facil", "Fácil"), ("normal", "Normal"), ("dificil", "Difícil"),
+            ))
+        ]
+        self.materias_rects = [
+            (pygame.Rect(LARGURA // 2 - 280 + (i % 2) * 285,
+                         235 + (i // 2) * 60, 270, 48), materia)
+            for i, materia in enumerate(MATERIAS_QUIZ)
+        ]
+        self.botao_confirmar_rect = pygame.Rect(LARGURA // 2 - 120, 445, 240, 48)
         self.novo_jogo()
         self.estado = "MENU"
 
@@ -522,7 +658,7 @@ class Jogo:
         self.estado = "JOGANDO"
 
     def carregar_nivel(self):
-        self.blocos = criar_blocos(self.nivel)
+        self.blocos = criar_blocos(self.nivel, self.modo_jogo, self.dificuldade)
         self.drops, self.lasers, self.particulas, self.textos = [], [], [], []
         self.ativos = {}
         self.quiz = None
@@ -538,8 +674,12 @@ class Jogo:
         self.acel = 1.0
 
     def velocidade_bola(self):
-        v = min(5.2 + 0.45 * (self.nivel - 1), 8.5) * self.acel
-        return v * (0.65 if "LENTA" in self.ativos else 1.0)
+        ajustes = {"facil": (0.88, 0.28, 8.0), "normal": (1.0, 0.4, 9.0),
+                   "dificil": (1.16, 0.58, 10.0)}
+        fator, crescimento, limite = ajustes[self.dificuldade]
+        v = min((4.8 + crescimento * (self.nivel - 1)) * fator, limite) * self.acel
+        v *= 0.65 if "LENTA" in self.ativos else 1.0
+        return v * (1.35 if "BOLA_RAPIDA" in self.ativos else 1.0)
 
     def lancar(self):
         sp = self.velocidade_bola()
@@ -568,9 +708,10 @@ class Jogo:
 
     # ---------------- quiz ----------------
     def abrir_quiz(self, tipo):
-        p = sortear_pergunta(self.nivel, self.ultima_cat)
+        p = sortear_pergunta(self.nivel, self.ultima_cat, self.materias_selecionadas)
         self.ultima_cat = p["categoria"]
-        tempo = max(10, 20 - self.nivel)
+        tempo_base = {"facil": 25, "normal": 20, "dificil": 16}[self.dificuldade]
+        tempo = max(8, tempo_base - int((self.nivel - 1) * 0.8))
         self.quiz = {"p": p, "tipo": tipo, "tempo": tempo, "restante": float(tempo),
                      "escolha": None, "acertou": None, "fb": 0.0, "bonus": 0}
         self.estado = "QUIZ"
@@ -596,7 +737,11 @@ class Jogo:
             self.aplicar_boost(q["tipo"])
             self.sons.tocar("certo")
         else:
-            self.ativos["ENCOLHE"] = PENALIDADE["dur"]
+            downgrade = random.choice(tuple(DOWNGRADES))
+            self.ativos[downgrade] = DOWNGRADES[downgrade]["dur"]
+            q["downgrade"] = downgrade
+            info = DOWNGRADES[downgrade]
+            self.textos.append(TextoFlutuante(f"{info['nome']}!", self.raquete.x, self.raquete.y - 40, info["cor"]))
             self.sons.tocar("errado")
         q["fb"] = 2.4
 
@@ -604,6 +749,13 @@ class Jogo:
         self.quiz = None
         self.estado = "JOGANDO"
         self.congelado = 0.7
+
+    def alternar_materia(self, materia):
+        if materia in self.materias_selecionadas:
+            if len(self.materias_selecionadas) > 1:
+                self.materias_selecionadas.remove(materia)
+        else:
+            self.materias_selecionadas.add(materia)
 
     def aplicar_boost(self, tipo):
         info = BOOSTS[tipo]
@@ -627,6 +779,11 @@ class Jogo:
     def acertar_bloco(self, bl, destruir=False):
         if bl not in self.blocos:
             return
+        if bl.tipo == "obstaculo":
+            return
+        if bl.tipo == "bomba":
+            self.explodir_bomba(bl)
+            return
         bl.hp = 0 if destruir else bl.hp - 1
         cx, cy = bl.rect.center
         if bl.hp > 0:
@@ -644,10 +801,43 @@ class Jogo:
             tipos, pesos = zip(*PESOS_BOOST.items())
             self.drops.append(Drop(cx, cy, random.choices(tipos, pesos)[0]))
 
+    def explodir_bomba(self, bomba):
+        fila = [bomba]
+        raio = 105
+        while fila:
+            atual = fila.pop()
+            if atual not in self.blocos or atual.tipo != "bomba":
+                continue
+            self.blocos.remove(atual)
+            cx, cy = atual.rect.center
+            self.sons.tocar("bloco")
+            for _ in range(28):
+                self.particulas.append(Particula(cx, cy, random.choice(((255, 90, 40), (255, 190, 50), (230, 230, 210)))))
+            self.textos.append(TextoFlutuante("BOOM!", cx, cy, (255, 150, 60)))
+            for vizinho in self.blocos[:]:
+                vx, vy = vizinho.rect.center
+                if math.hypot(vx - cx, vy - cy) > raio:
+                    continue
+                if vizinho.tipo == "bomba":
+                    fila.append(vizinho)
+                elif vizinho.tipo == "normal":
+                    self.acertar_bloco(vizinho, destruir=True)
+
     def colidir_blocos(self, b, eixo):
         rb = b.rect()
         atingidos = [bl for bl in self.blocos if rb.colliderect(bl.rect)]
         if not atingidos:
+            return
+        obstaculos = [bl for bl in atingidos if bl.tipo == "obstaculo"]
+        if obstaculos:
+            bl = obstaculos[0]
+            if eixo == "x":
+                b.x = bl.rect.left - b.r - 0.1 if b.vx > 0 else bl.rect.right + b.r + 0.1
+                b.vx = -b.vx
+            else:
+                b.y = bl.rect.top - b.r - 0.1 if b.vy > 0 else bl.rect.bottom + b.r + 0.1
+                b.vy = -b.vy
+            self.sons.tocar("duro")
             return
         if "FOGO" in self.ativos:
             for bl in atingidos:
@@ -770,7 +960,7 @@ class Jogo:
         dx = (teclas[pygame.K_RIGHT] or teclas[pygame.K_d]) - (teclas[pygame.K_LEFT] or teclas[pygame.K_a])
         if dx:
             self.usar_mouse = False
-            r.x += dx * r.vel * dt * 60
+            r.x += dx * r.vel * (0.55 if "RAQUETE_LENTA" in self.ativos else 1.0) * dt * 60
         elif self.usar_mouse:
             r.x = pygame.mouse.get_pos()[0]
         r.x = max(r.largura / 2, min(LARGURA - r.largura / 2, r.x))
@@ -825,7 +1015,8 @@ class Jogo:
         if self.pontos > self.recorde:
             self.recorde = self.pontos
 
-        if not self.blocos:
+        if not any(bl.tipo != "obstaculo" for bl in self.blocos):
+            self.blocos.clear()
             self.pontos += self.vidas * 100 * self.nivel
             self.timer_nivel = 2.5
             self.estado = "NIVEL"
@@ -841,9 +1032,106 @@ class Jogo:
         if self.estado == "MENU":
             if ev.type == pygame.KEYDOWN:
                 if ev.key in (pygame.K_RETURN, pygame.K_KP_ENTER, pygame.K_SPACE):
-                    self.novo_jogo()
+                    self.estado = "SELECAO_MODO"
                 elif ev.key == pygame.K_ESCAPE:
                     self.sair()
+            elif ev.type == pygame.MOUSEBUTTONDOWN and ev.button == 1:
+                if self.botao_jogar_rect.collidepoint(ev.pos):
+                    self.estado = "SELECAO_MODO"
+
+        elif self.estado == "SELECAO_MODO":
+            if ev.type == pygame.KEYDOWN:
+                modos = {pygame.K_1: "padrao", pygame.K_2: "random",
+                         pygame.K_KP1: "padrao", pygame.K_KP2: "random"}
+                if ev.key in modos:
+                    self.modo_jogo = modos[ev.key]
+                    self.estado = "SELECAO_DIFICULDADE"
+                elif ev.key in (pygame.K_LEFT, pygame.K_RIGHT, pygame.K_UP, pygame.K_DOWN):
+                    self.foco_modo = 1 - self.foco_modo
+                elif ev.key in (pygame.K_RETURN, pygame.K_KP_ENTER, pygame.K_SPACE):
+                    self.modo_jogo = self.modos_jogo_rects[self.foco_modo][1]
+                    self.estado = "SELECAO_DIFICULDADE"
+                elif ev.key == pygame.K_ESCAPE:
+                    self.estado = "MENU"
+            elif ev.type == pygame.MOUSEBUTTONDOWN and ev.button == 1:
+                for rect, modo, _ in self.modos_jogo_rects:
+                    if rect.collidepoint(ev.pos):
+                        self.modo_jogo = modo
+                        self.estado = "SELECAO_DIFICULDADE"
+                        break
+
+        elif self.estado == "SELECAO_DIFICULDADE":
+            if ev.type == pygame.KEYDOWN:
+                dificuldades = {pygame.K_1: "facil", pygame.K_2: "normal", pygame.K_3: "dificil",
+                                pygame.K_KP1: "facil", pygame.K_KP2: "normal", pygame.K_KP3: "dificil"}
+                if ev.key in dificuldades:
+                    self.dificuldade = dificuldades[ev.key]
+                    self.estado = "SELECAO_QUIZ"
+                elif ev.key in (pygame.K_LEFT, pygame.K_RIGHT):
+                    self.foco_dificuldade = (self.foco_dificuldade + (1 if ev.key == pygame.K_RIGHT else -1)) % len(self.dificuldades_rects)
+                elif ev.key in (pygame.K_UP, pygame.K_DOWN):
+                    self.foco_dificuldade = 1
+                elif ev.key in (pygame.K_RETURN, pygame.K_KP_ENTER, pygame.K_SPACE):
+                    self.dificuldade = self.dificuldades_rects[self.foco_dificuldade][1]
+                    self.estado = "SELECAO_QUIZ"
+                elif ev.key == pygame.K_ESCAPE:
+                    self.estado = "SELECAO_MODO"
+            elif ev.type == pygame.MOUSEBUTTONDOWN and ev.button == 1:
+                for rect, dificuldade, _ in self.dificuldades_rects:
+                    if rect.collidepoint(ev.pos):
+                        self.dificuldade = dificuldade
+                        self.estado = "SELECAO_QUIZ"
+                        break
+
+        elif self.estado == "SELECAO_QUIZ":
+            if ev.type == pygame.KEYDOWN:
+                materias_por_tecla = {
+                    pygame.K_1: MATERIAS_QUIZ[0], pygame.K_2: MATERIAS_QUIZ[1],
+                    pygame.K_3: MATERIAS_QUIZ[2], pygame.K_4: MATERIAS_QUIZ[3],
+                    pygame.K_5: MATERIAS_QUIZ[4], pygame.K_KP1: MATERIAS_QUIZ[0],
+                    pygame.K_KP2: MATERIAS_QUIZ[1], pygame.K_KP3: MATERIAS_QUIZ[2],
+                    pygame.K_KP4: MATERIAS_QUIZ[3], pygame.K_KP5: MATERIAS_QUIZ[4],
+                }
+                if ev.key in materias_por_tecla:
+                    self.foco_materia = MATERIAS_QUIZ.index(materias_por_tecla[ev.key])
+                    self.alternar_materia(self.materias_rects[self.foco_materia][1])
+                    self.foco_confirmar = False
+                elif ev.key in (pygame.K_LEFT, pygame.K_RIGHT, pygame.K_UP, pygame.K_DOWN):
+                    self.foco_confirmar = False
+                    if ev.key == pygame.K_LEFT:
+                        self.foco_materia = max(0, self.foco_materia - 1)
+                    elif ev.key == pygame.K_RIGHT:
+                        self.foco_materia = min(len(self.materias_rects) - 1, self.foco_materia + 1)
+                    elif ev.key == pygame.K_UP:
+                        self.foco_materia = max(0, self.foco_materia - 2)
+                    else:
+                        proximo = self.foco_materia + 2
+                        self.foco_materia = min(len(self.materias_rects) - 1, proximo)
+                elif ev.key == pygame.K_TAB:
+                    self.foco_confirmar = not self.foco_confirmar
+                elif ev.key == pygame.K_SPACE:
+                    if self.foco_confirmar:
+                        self.novo_jogo()
+                    else:
+                        self.alternar_materia(self.materias_rects[self.foco_materia][1])
+                elif ev.key in (pygame.K_RETURN, pygame.K_KP_ENTER):
+                    if self.foco_confirmar:
+                        self.novo_jogo()
+                    else:
+                        self.alternar_materia(self.materias_rects[self.foco_materia][1])
+                elif ev.key == pygame.K_ESCAPE:
+                    self.estado = "SELECAO_DIFICULDADE"
+            elif ev.type == pygame.MOUSEBUTTONDOWN and ev.button == 1:
+                for rect, materia in self.materias_rects:
+                    if rect.collidepoint(ev.pos):
+                        self.foco_materia = next(i for i, (_, item) in enumerate(self.materias_rects) if item == materia)
+                        self.foco_confirmar = False
+                        self.alternar_materia(materia)
+                        break
+                else:
+                    if self.botao_confirmar_rect.collidepoint(ev.pos):
+                        self.foco_confirmar = True
+                        self.novo_jogo()
 
         elif self.estado == "JOGANDO":
             if ev.type == pygame.KEYDOWN:
@@ -916,8 +1204,8 @@ class Jogo:
         # Boosts ativos
         x = 16
         for k, resto in self.ativos.items():
-            info = BOOSTS.get(k, PENALIDADE)
-            total = info["dur"] if k in BOOSTS else PENALIDADE["dur"]
+            info = BOOSTS.get(k, DOWNGRADES.get(k))
+            total = info["dur"]
             rotulo = self.f_mini.render(f"{info['nome']} {int(math.ceil(resto))}s", True, BRANCO)
             w = rotulo.get_width() + 14
             rect = pygame.Rect(x, 36, w, 20)
@@ -933,6 +1221,18 @@ class Jogo:
         t.blit(self.fundo, (0, 0))
         # Blocos
         for bl in self.blocos:
+            if bl.tipo == "obstaculo":
+                pygame.draw.rect(t, (105, 112, 128), bl.rect, border_radius=3)
+                pygame.draw.rect(t, (185, 190, 202), bl.rect, width=2, border_radius=3)
+                continue
+            if bl.tipo == "bomba":
+                pygame.draw.rect(t, (155, 45, 42), bl.rect, border_radius=7)
+                pygame.draw.rect(t, (255, 115, 65), bl.rect, width=2, border_radius=7)
+                pygame.draw.circle(t, (255, 205, 85), bl.rect.center, 7)
+                pygame.draw.circle(t, (75, 35, 35), bl.rect.center, 3)
+                pygame.draw.line(t, (255, 225, 150), (bl.rect.centerx + 4, bl.rect.centery - 4),
+                                (bl.rect.centerx + 11, bl.rect.centery - 11), 3)
+                continue
             cor = misturar(bl.cor, (210, 210, 225), 0.35 * (bl.hp - 1))
             pygame.draw.rect(t, cor, bl.rect, border_radius=3)
             pygame.draw.line(t, misturar(cor, (255, 255, 255), 0.4), bl.rect.topleft, (bl.rect.right - 1, bl.rect.top), 2)
@@ -959,7 +1259,7 @@ class Jogo:
         r = self.raquete
         pr = r.rect()
         cor_r = (90, 200, 255)
-        if "ENCOLHE" in self.ativos:
+        if "ENCOLHE" in self.ativos or "RAQUETE_LENTA" in self.ativos:
             cor_r = (150, 150, 160)
         if "IMA" in self.ativos:
             cor_r = BOOSTS["IMA"]["cor"]
@@ -1050,9 +1350,11 @@ class Jogo:
             if q["acertou"]:
                 msg, cor = f"CORRETO!  +{q['bonus']} pts  •  {info['nome']} ativado", VERDE_OK
             elif q["escolha"] == -1:
-                msg, cor = f"TEMPO ESGOTADO!  Resposta: {p['resposta']}  •  Raquete encolhida", VERMELHO_ERRO
+                penalidade = DOWNGRADES[q["downgrade"]]
+                msg, cor = f"TEMPO ESGOTADO!  Resposta: {p['resposta']}  •  {penalidade['nome']}", VERMELHO_ERRO
             else:
-                msg, cor = f"ERROU!  Resposta: {p['resposta']}  •  Raquete encolhida por {PENALIDADE['dur']}s", VERMELHO_ERRO
+                penalidade = DOWNGRADES[q["downgrade"]]
+                msg, cor = f"ERROU!  Resposta: {p['resposta']}  •  {penalidade['nome']} por {penalidade['dur']}s", VERMELHO_ERRO
             texto_centro(t, self.f_med, msg, cor, painel.centerx, yb + 4)
             texto_centro(t, self.f_mini, "ENTER para continuar", CINZA, painel.centerx, yb + 32)
 
@@ -1069,8 +1371,8 @@ class Jogo:
     def desenhar_menu(self):
         t = self.tela
         t.blit(self.fundo, (0, 0))
-        self.desenhar_titulo("BREAKOUT", 40)
-        texto_centro(t, self.f_grande, "M A T E M Á T I C O", (150, 210, 255), LARGURA / 2, 140)
+        self.desenhar_titulo("BREAKOUT GENIUS", 40)
+        texto_centro(t, self.f_grande, "MATEMÁTICA + CONHECIMENTOS GERAIS", (150, 210, 255), LARGURA / 2, 140)
         texto_centro(t, self.f_peq, "Quebre os blocos, pegue as cápsulas e resolva a questão sorteada para ganhar o boost!",
                      BRANCO, LARGURA / 2, 185)
         # Boosts
@@ -1086,13 +1388,100 @@ class Jogo:
         cats = list(QUESTIONARIOS)
         texto_centro(t, self.f_peq, "  •  ".join(cats[:5]), BRANCO, LARGURA / 2, 460)
         texto_centro(t, self.f_peq, "  •  ".join(cats[5:]), BRANCO, LARGURA / 2, 486)
-        texto_centro(t, self.f_peq, "Errou ou o tempo acabou? A raquete encolhe por 8 segundos.", VERMELHO_ERRO, LARGURA / 2, 520)
+        texto_centro(t, self.f_peq, "Conhecimentos gerais: Geografia  •  Ciências  •  História  •  Cultura",
+                 BRANCO, LARGURA / 2, 512)
+        texto_centro(t, self.f_peq, "Errou ou o tempo acabou? Recebe um downgrade por 8 segundos.", VERMELHO_ERRO, LARGURA / 2, 530)
+        rotulo_materias = "   •   ".join(
+            f"[x] {materia}" for materia in MATERIAS_QUIZ if materia in self.materias_selecionadas
+        )
+        nomes_modo = {"padrao": "Padrão", "random": "Random"}
+        nomes_dificuldade = {"facil": "Fácil", "normal": "Normal", "dificil": "Difícil"}
+        texto_centro(t, self.f_peq_b,
+                 f"MODO: {nomes_modo[self.modo_jogo]}   •   DIFICULDADE: {nomes_dificuldade[self.dificuldade]}",
+                     (150, 210, 255), LARGURA / 2, 553)
+        texto_centro(t, self.f_peq, f"QUIZ: {rotulo_materias}", BRANCO, LARGURA / 2, 577)
         # Controles
         texto_centro(t, self.f_peq, "← → / A D / mouse: mover   •   ESPAÇO: lançar / laser   •   1-4: responder   •   P: pausa",
-                     CINZA, LARGURA / 2, 580)
-        texto_centro(t, self.f_peq_b, f"RECORDE: {self.recorde}", (150, 210, 255), LARGURA / 2, 615)
-        if int(self.tempo * 2) % 2 == 0:
-            texto_centro(t, self.f_med, "Pressione ENTER para começar", BRANCO, LARGURA / 2, 665)
+                 CINZA, LARGURA / 2, 606)
+        texto_centro(t, self.f_peq_b, f"RECORDE: {self.recorde}", (150, 210, 255), LARGURA / 2, 632)
+        pygame.draw.rect(t, (45, 110, 175), self.botao_jogar_rect, border_radius=8)
+        pygame.draw.rect(t, (150, 210, 255), self.botao_jogar_rect, width=2, border_radius=8)
+        texto_centro(t, self.f_med, "JOGAR", BRANCO, self.botao_jogar_rect.centerx, self.botao_jogar_rect.centery)
+
+    def desenhar_selecao_quiz(self):
+        self.desenhar_menu()
+        camada = pygame.Surface((LARGURA, ALTURA), pygame.SRCALPHA)
+        camada.fill((0, 0, 0, 190))
+        self.tela.blit(camada, (0, 0))
+        painel = pygame.Rect(LARGURA // 2 - 320, 150, 640, 430)
+        pygame.draw.rect(self.tela, (24, 24, 48), painel, border_radius=10)
+        pygame.draw.rect(self.tela, (100, 140, 210), painel, width=2, border_radius=10)
+        texto_centro(self.tela, self.f_med, "ESCOLHA AS MATÉRIAS", BRANCO, painel.centerx, 195)
+        for i, (rect, materia) in enumerate(self.materias_rects):
+            selecionada = materia in self.materias_selecionadas
+            cor = (55, 115, 165) if selecionada else (45, 48, 76)
+            pygame.draw.rect(self.tela, cor, rect, border_radius=6)
+            focada = i == self.foco_materia and not self.foco_confirmar
+            cor_borda = (255, 220, 120) if focada else ((150, 210, 255) if selecionada else (100, 105, 135))
+            pygame.draw.rect(self.tela, cor_borda, rect, width=3 if focada else (2 if selecionada else 1),
+                             border_radius=6)
+            marca = "[x]" if selecionada else "[ ]"
+            texto_centro(self.tela, self.f_peq_b, f"{marca} {materia}", BRANCO,
+                         rect.centerx, rect.centery)
+        pygame.draw.rect(self.tela, (45, 110, 175), self.botao_confirmar_rect, border_radius=7)
+        pygame.draw.rect(self.tela, (255, 220, 120) if self.foco_confirmar else (150, 210, 255),
+                 self.botao_confirmar_rect, width=3 if self.foco_confirmar else 2, border_radius=7)
+        texto_centro(self.tela, self.f_peq_b, "COMEÇAR", BRANCO,
+                     self.botao_confirmar_rect.centerx, self.botao_confirmar_rect.centery)
+        texto_centro(self.tela, self.f_mini, "Setas navegam; Espaço/Enter marca; Tab vai a Começar; Esc volta",
+                     CINZA, painel.centerx, 535)
+
+    def desenhar_selecao_modo(self):
+        self.desenhar_menu()
+        camada = pygame.Surface((LARGURA, ALTURA), pygame.SRCALPHA)
+        camada.fill((0, 0, 0, 190))
+        self.tela.blit(camada, (0, 0))
+        painel = pygame.Rect(LARGURA // 2 - 330, 205, 660, 310)
+        pygame.draw.rect(self.tela, (24, 24, 48), painel, border_radius=10)
+        pygame.draw.rect(self.tela, (100, 140, 210), painel, width=2, border_radius=10)
+        texto_centro(self.tela, self.f_med, "ESCOLHA O MODO DE JOGO", BRANCO, painel.centerx, 255)
+        descricoes = {"padrao": "Fases clássicas em sequência", "random": "Fases procedurais aleatórias"}
+        for i, (rect, modo, nome) in enumerate(self.modos_jogo_rects):
+            selecionado = modo == self.modo_jogo
+            pygame.draw.rect(self.tela, (55, 115, 165) if selecionado else (45, 48, 76),
+                             rect, border_radius=8)
+            pygame.draw.rect(self.tela, (255, 220, 120) if i == self.foco_modo else (150, 210, 255),
+                             rect, width=3 if i == self.foco_modo else 2, border_radius=8)
+            texto_centro(self.tela, self.f_med, nome, BRANCO, rect.centerx, rect.centery - 10)
+            texto_centro(self.tela, self.f_mini, descricoes[modo], CINZA, rect.centerx, rect.centery + 19)
+        texto_centro(self.tela, self.f_mini, "Clique ou pressione 1/2 para escolher; Esc volta",
+                     CINZA, painel.centerx, 475)
+
+    def desenhar_selecao_dificuldade(self):
+        self.desenhar_menu()
+        camada = pygame.Surface((LARGURA, ALTURA), pygame.SRCALPHA)
+        camada.fill((0, 0, 0, 190))
+        self.tela.blit(camada, (0, 0))
+        painel = pygame.Rect(LARGURA // 2 - 360, 220, 720, 280)
+        pygame.draw.rect(self.tela, (24, 24, 48), painel, border_radius=10)
+        pygame.draw.rect(self.tela, (100, 140, 210), painel, width=2, border_radius=10)
+        texto_centro(self.tela, self.f_med, "ESCOLHA A DIFICULDADE", BRANCO, painel.centerx, 270)
+        detalhes = {
+            "facil": "Bola mais lenta, mais tempo",
+            "normal": "Ritmo equilibrado",
+            "dificil": "Bola rápida, menos tempo",
+        }
+        for i, (rect, dificuldade, nome) in enumerate(self.dificuldades_rects):
+            selecionado = dificuldade == self.dificuldade
+            pygame.draw.rect(self.tela, (55, 115, 165) if selecionado else (45, 48, 76),
+                             rect, border_radius=8)
+            pygame.draw.rect(self.tela, (255, 220, 120) if i == self.foco_dificuldade else (150, 210, 255),
+                             rect, width=3 if i == self.foco_dificuldade else 2, border_radius=8)
+            texto_centro(self.tela, self.f_peq_b, nome, BRANCO, rect.centerx, rect.centery - 8)
+            texto_centro(self.tela, self.f_mini, detalhes[dificuldade], CINZA,
+                         rect.centerx, rect.centery + 17)
+        texto_centro(self.tela, self.f_mini, "Clique ou pressione 1/2/3 para escolher; Esc volta",
+                     CINZA, painel.centerx, 455)
 
     def desenhar_fim(self):
         t = self.tela
@@ -1127,6 +1516,12 @@ class Jogo:
     def desenhar(self):
         if self.estado == "MENU":
             self.desenhar_menu()
+        elif self.estado == "SELECAO_MODO":
+            self.desenhar_selecao_modo()
+        elif self.estado == "SELECAO_DIFICULDADE":
+            self.desenhar_selecao_dificuldade()
+        elif self.estado == "SELECAO_QUIZ":
+            self.desenhar_selecao_quiz()
         elif self.estado == "FIM":
             self.desenhar_fim()
         else:
