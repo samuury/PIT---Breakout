@@ -393,7 +393,11 @@ def _pergunta_textual(categoria, enunciado, correta, distratores):
             "indice_correto": opcoes.index(resposta), "resposta": resposta}
 
 
-def sortear_pergunta(nivel, evitar=None, materias=None):
+def _identificar_pergunta(categoria, pergunta):
+    return categoria, pergunta["enunciado"], tuple(pergunta["opcoes"])
+
+
+def sortear_pergunta(nivel, evitar=None, materias=None, usadas=None):
     selecionadas = set(materias or ("Matemática",))
     opcoes = []
     for materia in MATERIAS_QUIZ:
@@ -405,8 +409,23 @@ def sortear_pergunta(nivel, evitar=None, materias=None):
             opcoes.append((materia, None))
     if not opcoes:
         opcoes = list(QUESTIONARIOS.items())
-    disponiveis = [opcao for opcao in opcoes if opcao[0] != evitar] or opcoes
-    categoria, gerador = random.choice(disponiveis)
+    usadas = set(usadas or ())
+    categorias = [opcao for opcao in opcoes if opcao[0] != evitar]
+    if not categorias:
+        categorias = opcoes
+
+    for _ in range(20):
+        categoria, gerador = random.choice(categorias)
+        if gerador is not None:
+            pergunta = gerador(nivel)
+        else:
+            perguntas = QUESTIONARIOS_GERAIS[categoria]
+            pergunta = _pergunta_textual(categoria, *random.choice(perguntas))
+        identificador = _identificar_pergunta(categoria, pergunta)
+        if identificador not in usadas:
+            return pergunta
+
+    categoria, gerador = random.choice(categorias)
     if gerador is not None:
         return gerador(nivel)
     return _pergunta_textual(categoria, *random.choice(QUESTIONARIOS_GERAIS[categoria]))
@@ -683,6 +702,7 @@ class Jogo:
         self.fundo = criar_fundo()
         self.recorde = carregar_recorde()
         self.materias_selecionadas = {"Matemática"}
+        self.perguntas_usadas = set()
         self.modo_jogo = "padrao"
         self.dificuldade = "normal"
         self.foco_modo = 0
@@ -717,6 +737,7 @@ class Jogo:
         self.pontos, self.vidas, self.nivel = 0, 3, 1
         self.stats = {"total": 0, "acertos": 0, "por_cat": {}, "tempo": 0.0, "boosts": {}}
         self.ultima_cat = None
+        self.perguntas_usadas = set()
         self.raquete = Raquete()
         self.carregar_nivel()
         self.estado = "JOGANDO"
@@ -772,8 +793,9 @@ class Jogo:
 
     # ---------------- quiz ----------------
     def abrir_quiz(self, tipo):
-        p = sortear_pergunta(self.nivel, self.ultima_cat, self.materias_selecionadas)
+        p = sortear_pergunta(self.nivel, self.ultima_cat, self.materias_selecionadas, self.perguntas_usadas)
         self.ultima_cat = p["categoria"]
+        self.perguntas_usadas.add((p["categoria"], p["enunciado"], tuple(p["opcoes"])))
         tempo_base = {"facil": 25, "normal": 20, "dificil": 16}[self.dificuldade]
         tempo = max(8, tempo_base - int((self.nivel - 1) * 0.8))
         self.quiz = {"p": p, "tipo": tipo, "tempo": tempo, "restante": float(tempo),
