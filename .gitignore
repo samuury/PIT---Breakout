@@ -1,1 +1,5 @@
 recorde_breakout_matematico.txt
+.vscode/
+.godot/
+__pycache__/
+*.py[cod]

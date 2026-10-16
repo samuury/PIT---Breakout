@@ -1,28 +1,43 @@
-# PIT - Breakout
-Trabalho acadêmico de programação orientada a objetos usando pygame.
+# Breakout Matemático
 
-BREAKOUT MATEMÁTICO  —  Pygame
-==============================
-Releitura do Breakout (Atari, 1976) com questionários de matemática.
+Projeto acadêmico de programação orientada a objetos: um jogo inspirado em
+Breakout com perguntas de matemática e conhecimentos gerais.
 
-Como funciona
--------------
-- Quebre os blocos com a bola, como no Breakout original.
-- Alguns blocos soltam uma CÁPSULA (drop) com um boost.
-- Ao pegar a cápsula com a raquete, o jogo pausa e sorteia uma questão
-  de um dos 10 questionários (Aritmética, Tabuada, Divisão, Porcentagem,
-  Equações, Potências e Raízes, Frações, Expressões, Sequências, Problemas).
-- Acertou: ganha o boost da cápsula + pontos bônus (quanto mais rápido, mais pontos).
-- Errou ou o tempo acabou: a raquete encolhe por alguns segundos.
-- A dificuldade das questões e a velocidade da bola aumentam a cada nível.
+## Versão principal: Godot
 
-Controles
----------
-  ← → ou A D / mouse ...... mover a raquete
-  ESPAÇO / clique ......... lançar a bola / disparar laser
-  1 2 3 4 / clique ........ responder o questionário
-  P ou ESC ................ pausar
-  ENTER ................... iniciar / reiniciar
+A versão atual é feita em Godot 4 e inicia pela cena `Main.tscn`. O jogo inclui
+modos de jogo, níveis de dificuldade, blocos especiais, melhorias e penalidades,
+questionários, estatísticas por matéria e recorde salvo.
 
-Requisito:  pip install pygame
-Executar:   python breakout_matematico.py
+### Executar
+
+1. Instale o Godot 4.4 ou superior.
+2. Importe `project.godot` no Godot, ou abra o projeto pela linha de comando:
+
+```sh
+godot --path .
+```
+
+No editor, execute o projeto com **F6** para a cena atual ou **F5** para iniciar
+pela cena principal.
+
+### Testes headless
+
+Com o Godot disponível no `PATH`, execute o teste automatizado:
+
+```sh
+MODO=padrao DIF=normal godot --headless --path . --script tests/test_headless.gd
+```
+
+## Versão Python
+
+`TestGame.py` contém uma versão jogável em Pygame. Para executá-la, instale
+Python 3 e a dependência:
+
+```sh
+python -m pip install pygame
+python TestGame.py
+```
+
+O recorde da versão Python é salvo em
+`recorde_breakout_matematico.txt` no diretório do projeto.
