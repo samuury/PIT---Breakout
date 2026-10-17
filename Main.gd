@@ -18,18 +18,18 @@ const ROWS := 8
 const BR_W := 1.8
 const BR_H := 0.7
 const BR_GAP := 0.1
-const DROP_CHANCE := 0.22
+const DROP_CHANCE := 0.12
+const DROP_COOLDOWN := 3.5
+const MAX_BALLS := 6
+const STALL_LIMIT := 8.0
 const MAX_DROPS := 3
-const SPEED_K := 1.5
+const SPEED_K := 1.875  # +25% sobre o valor anterior (1.5), vale para todas as dificuldades
 const SAVE_PATH := "user://recorde_breakout_matematico.txt"
+const QUESTIONS_PATH := "res://data/perguntas.json"
+const QuizBankScript := preload("res://quiz_bank.gd")
+const LevelGenScript := preload("res://level_gen.gd")
 const ROW_PTS := [7, 7, 5, 5, 3, 3, 1, 1]
 const MATERIAS := ["Matemática", "Geografia", "Ciências", "História", "Cultura"]
-const MATH_GENS := [
-	["Aritmética", "q_aritmetica"], ["Tabuada", "q_tabuada"], ["Divisão", "q_divisao"],
-	["Porcentagem", "q_porcentagem"], ["Equações", "q_equacao"],
-	["Potências e Raízes", "q_potencia"], ["Frações", "q_fracao"],
-	["Expressões", "q_expressao"], ["Sequências", "q_sequencia"], ["Problemas", "q_problema"]]
-
 var ROW_COLORS: Array[Color] = [
 	Color8(200, 72, 72), Color8(200, 72, 72), Color8(198, 108, 58), Color8(198, 108, 58),
 	Color8(72, 160, 72), Color8(72, 160, 72), Color8(200, 190, 60), Color8(200, 190, 60)]
@@ -57,116 +57,6 @@ var DIFS := {
 		"vida_extra": 0, "haz_obs": 4, "haz_bomba": 3, "tempo": 20, "desc": "Ritmo equilibrado"},
 	"dificil": {"nome": "Difícil", "fator": 1.16, "cresc": 0.58, "limite": 10.0, "densidade": 0.86,
 		"vida_extra": 1, "haz_obs": 5, "haz_bomba": 4, "tempo": 16, "desc": "Bola rápida, menos tempo"},
-}
-
-# Perguntas de conhecimentos gerais: [enunciado, correta, [erradas]]
-var GERAIS := {
-	"Geografia": [
-		["Qual é a capital da Austrália?", "Canberra", ["Sydney", "Melbourne", "Perth"]],
-		["Qual é o maior estado brasileiro em área?", "Amazonas", ["Pará", "Mato Grosso", "Minas Gerais"]],
-		["Qual é o maior oceano da Terra?", "Oceano Pacífico", ["Oceano Atlântico", "Oceano Índico", "Oceano Ártico"]],
-		["Qual rio é tradicionalmente associado ao Egito?", "Rio Nilo", ["Rio Amazonas", "Rio Danúbio", "Rio Ganges"]],
-		["Qual é a capital do Japão?", "Tóquio", ["Osaka", "Quioto", "Hiroshima"]],
-		["Qual é o maior deserto do mundo?", "Antártida", ["Saara", "Gobi", "Atacama"]],
-		["Em qual cordilheira fica o Monte Everest?", "Himalaia", ["Andes", "Alpes", "Montanhas Rochosas"]],
-		["Qual país tem formato de uma bota e fica no sul da Europa?", "Itália", ["Grécia", "Portugal", "Croácia"]],
-		["Qual é a capital da França?", "Paris", ["Marselha", "Lyon", "Nantes"]],
-		["Qual é o menor país do mundo?", "Vaticano", ["Mônaco", "São Marino", "Liechtenstein"]],
-		["Em qual continente fica o deserto do Saara?", "África", ["Ásia", "Europa", "América"]],
-		["Qual país é conhecido como a Terra do Sol Nascente?", "Japão", ["China", "Coreia do Sul", "Tailândia"]],
-		["Qual é a capital da Argentina?", "Buenos Aires", ["Rosário", "Córdoba", "Montevidéu"]],
-		["Qual é a capital do Canadá?", "Ottawa", ["Toronto", "Montreal", "Vancouver"]],
-		["Qual é a capital do Uruguai?", "Montevidéu", ["Assunção", "Santiago", "Lima"]],
-		["Qual é o rio mais longo do mundo?", "Rio Amazonas", ["Rio Nilo", "Rio Yangtzé", "Rio Mississipi"]],
-		["Qual é a capital da Noruega?", "Oslo", ["Estocolmo", "Copenhague", "Helsinque"]],
-		["Qual país tem a maior extensão territorial da América do Sul?", "Brasil", ["Argentina", "Peru", "Colômbia"]],
-		["Em qual país fica a cidade de Lisboa?", "Portugal", ["Espanha", "Itália", "França"]],
-		["Qual é a capital do México?", "Cidade do México", ["Guadalajara", "Monterrei", "Cancún"]],
-		["Qual é o ponto mais alto do Brasil?", "Pico da Neblina", ["Pico Paraná", "Monte Roraima", "Pico dos Órgãos"]],
-		["Qual estado brasileiro fica na região Nordeste?", "Bahia", ["Acre", "Rio Grande do Sul", "Pará"]],
-		["Qual é a maior ilha do mundo?", "Groenlândia", ["Madagáscar", "Bornéu", "Nova Guiné"]],
-		["Qual cidade fica na margem do Rio Tâmisa?", "Londres", ["Paris", "Berlim", "Madri"]],
-		["Qual é a capital do Chile?", "Santiago", ["Valparaíso", "Lima", "Bogotá"]],
-	],
-	"Ciências": [
-		["Qual é a fórmula química da água?", "H₂O", ["CO₂", "O₂", "NaCl"]],
-		["Qual planeta é conhecido como planeta vermelho?", "Marte", ["Vênus", "Júpiter", "Mercúrio"]],
-		["Qual gás as plantas absorvem principalmente na fotossíntese?", "Dióxido de carbono", ["Oxigênio", "Hidrogênio", "Hélio"]],
-		["Qual é a unidade de medida da corrente elétrica?", "Ampere", ["Volt", "Watt", "Ohm"]],
-		["Qual é o símbolo químico do ouro?", "Au", ["Ag", "Fe", "O"]],
-		["Qual gás é mais abundante na atmosfera terrestre?", "Nitrogênio", ["Oxigênio", "Dióxido de carbono", "Hidrogênio"]],
-		["Quantas câmaras tem o coração humano?", "Quatro", ["Duas", "Três", "Cinco"]],
-		["A que temperatura a água congela ao nível do mar?", "0 °C", ["-10 °C", "10 °C", "32 °C"]],
-		["Qual é a unidade de medida de força no Sistema Internacional?", "Newton", ["Joule", "Pascal", "Watt"]],
-		["Qual destes animais é um mamífero?", "Golfinho", ["Tubarão", "Polvo", "Truta"]],
-		["Qual é o órgão responsável pela circulação sanguínea?", "Coração", ["Pulmão", "Fígado", "Rim"]],
-		["Qual é o processo pelo qual a água passa do estado líquido para o gasoso?", "Evaporação", ["Condensação", "Solidificação", "Liquefação"]],
-		["Qual é a camada mais externa da Terra?", "Crosta", ["Manto", "Núcleo", "Mesosfera"]],
-		["Qual parte da célula contém o material genético?", "Núcleo", ["Membrana", "Mitocôndria", "Ribossomo"]],
-		["Qual é o gás liberado pelos seres vivos na respiração?", "Dióxido de carbono", ["Oxigênio", "Nitrogênio", "Hidrogênio"]],
-		["Qual elemento químico possui o símbolo Na?", "Sódio", ["Nióbio", "Níquel", "Neônio"]],
-		["Qual é a menor unidade viva?", "Célula", ["Átomo", "Molécula", "Tecido"]],
-		["Qual tipo de energia é armazenada em um objeto elevado?", "Energia potencial gravitacional", ["Energia térmica", "Energia cinética", "Energia química"]],
-		["Qual é a unidade de medida de pressão?", "Pascal", ["Volt", "Ohm", "Ampere"]],
-		["Qual é o nome do processo de formação das plantas a partir de sementes?", "Germinação", ["Fotossíntese", "Respiração", "Polinização"]],
-		["Qual é o maior órgão do corpo humano?", "Pele", ["Fígado", "Pulmão", "Coração"]],
-		["Qual gás é usado em muitos extintores de incêndio?", "Dióxido de carbono", ["Hélio", "Hidrogênio", "Oxigênio"]],
-		["Qual é a causa da formação das marés?", "A atração da Lua", ["O movimento das estrelas", "A temperatura do oceano", "O vento"]],
-		["Qual é o nome da molécula que transporta energia na célula?", "ATP", ["DNA", "RNA", "ADP"]],
-		["Qual tipo de ondas os celulares usam para transmitir sinais?", "Ondas eletromagnéticas", ["Ondas sonoras", "Ondas térmicas", "Ondas gravitacionais"]],
-	],
-	"História": [
-		["Em que ano foi proclamada a Independência do Brasil?", "1822", ["1500", "1889", "1922"]],
-		["Em que ano foi abolida a escravidão no Brasil?", "1888", ["1822", "1850", "1889"]],
-		["Em que ano terminou a Segunda Guerra Mundial?", "1945", ["1918", "1939", "1950"]],
-		["Qual cidade-estado grega é associada ao nascimento da democracia?", "Atenas", ["Esparta", "Corinto", "Tebas"]],
-		["Em que ano os portugueses chegaram ao território que hoje é o Brasil?", "1500", ["1492", "1530", "1600"]],
-		["Em que ano começou a Revolução Francesa?", "1789", ["1689", "1815", "1848"]],
-		["Qual civilização construiu Machu Picchu?", "Inca", ["Maia", "Asteca", "Olmeca"]],
-		["Quem foi o primeiro ser humano a pisar na Lua?", "Neil Armstrong", ["Yuri Gagarin", "Buzz Aldrin", "Alan Shepard"]],
-		["Quem foi o presidente dos Estados Unidos durante a Guerra de Secessão?", "Abraham Lincoln", ["George Washington", "Ulysses S. Grant", "Thomas Jefferson"]],
-		["Em que ano ocorreu a Proclamação da República no Brasil?", "1889", ["1879", "1900", "1892"]],
-		["Qual foi a primeira vila fundada pelos portugueses no Brasil, em 1532?", "São Vicente", ["Salvador", "Rio de Janeiro", "Recife"]],
-		["Quem assinou a Lei Áurea, que aboliu a escravidão no Brasil?", "Princesa Isabel", ["Dom Pedro II", "Dom Pedro I", "Getúlio Vargas"]],
-		["Qual povo construiu o Coliseu?", "Romanos", ["Gregos", "Vikings", "Francos"]],
-		["Em que ano caiu o Muro de Berlim?", "1989", ["1961", "1975", "1991"]],
-		["Quem liderou a independência do Haiti?", "Toussaint Louverture", ["Simón Bolívar", "José Bonifácio", "Pedro I"]],
-		["Qual foi o primeiro presidente do Brasil?", "Deodoro da Fonseca", ["Floriano Peixoto", "Prudente de Morais", "Campos Sales"]],
-		["Em que ano começou a Primeira Guerra Mundial?", "1914", ["1898", "1904", "1918"]],
-		["Qual civilização construiu os zigurates?", "Mesopotâmica", ["Egípcia", "Inca", "Romana"]],
-		["Quem foi o líder da Revolução Cubana?", "Fidel Castro", ["Che Guevara", "Raúl Castro", "Fulgencio Batista"]],
-		["Qual foi o período em que o Brasil foi governado por uma monarquia?", "Império", ["Colônia", "República Velha", "Ditadura"]],
-		["Quem foi o autor da Declaração de Independência dos Estados Unidos?", "Thomas Jefferson", ["Benjamin Franklin", "John Adams", "George Washington"]],
-		["Quem comandou o exército aliado que derrotou Napoleão em Waterloo?", "Duque de Wellington", ["Napoleão Bonaparte", "Júlio César", "Nelson"]],
-		["Qual civilização antiga construiu as pirâmides de Gizé?", "Egípcia", ["Romana", "Grega", "Persa"]],
-		["Em que ano foi proclamada a Independência dos Estados Unidos?", "1776", ["1789", "1804", "1750"]],
-	],
-	"Cultura": [
-		["Quem pintou a Mona Lisa?", "Leonardo da Vinci", ["Michelangelo", "Vincent van Gogh", "Pablo Picasso"]],
-		["Quem escreveu o romance Dom Casmurro?", "Machado de Assis", ["José de Alencar", "Clarice Lispector", "Carlos Drummond de Andrade"]],
-		["Qual é o idioma oficial do Brasil?", "Português", ["Espanhol", "Francês", "Italiano"]],
-		["Qual instrumento musical tem teclas, cordas e martelos?", "Piano", ["Flauta", "Trompete", "Violino"]],
-		["Quem criou a personagem Harry Potter?", "J. K. Rowling", ["Suzanne Collins", "C. S. Lewis", "Agatha Christie"]],
-		["Qual estilo musical brasileiro está ligado ao desfile de escolas no Carnaval?", "Samba", ["Fado", "Tango", "Flamenco"]],
-		["Quantos anéis aparecem no símbolo dos Jogos Olímpicos?", "Cinco", ["Quatro", "Seis", "Sete"]],
-		["Qual destes instrumentos pertence à família das cordas?", "Violão", ["Clarinete", "Trombone", "Tímpano"]],
-		["Quem escreveu o livro O Pequeno Príncipe?", "Antoine de Saint-Exupéry", ["Jules Verne", "Luís de Camões", "George Orwell"]],
-		["Qual festa popular brasileira tem desfile de escolas de samba?", "Carnaval", ["Festa Junina", "Oktoberfest", "Círio de Nazaré"]],
-		["Quem compôs o Hino Nacional Brasileiro?", "Francisco Manuel da Silva", ["Heitor Villa-Lobos", "Tom Jobim", "Carlos Gomes"]],
-		["Qual festival de música acontece no Rio de Janeiro desde 1985?", "Rock in Rio", ["Lollapalooza", "Tomorrowland", "Coachella"]],
-		["Quem foi o escritor de A Divina Comédia?", "Dante Alighieri", ["William Shakespeare", "Miguel de Cervantes", "Friedrich Nietzsche"]],
-		["Qual destes artistas pintou Guernica?", "Pablo Picasso", ["Vincent van Gogh", "Claude Monet", "Leonardo da Vinci"]],
-		["Qual instrumento de cordas é o mais agudo da orquestra?", "Violino", ["Viola", "Violoncelo", "Contrabaixo"]],
-		["A qual movimento literário pertence Dom Casmurro?", "Realismo", ["Romantismo", "Modernismo", "Barroco"]],
-		["Quem escreveu a obra O Alienista?", "Machado de Assis", ["Érico Veríssimo", "Clarice Lispector", "Graciliano Ramos"]],
-		["Qual teatro de Manaus é famoso por sua cúpula colorida?", "Teatro Amazonas", ["Teatro Municipal do Rio de Janeiro", "Teatro da Paz", "Teatro Nacional"]],
-		["Quem criou a personagem Capitão América?", "Joe Simon e Jack Kirby", ["Stan Lee", "Steve Ditko", "Alan Moore"]],
-		["Qual gênero musical é associado à dança do tango?", "Tango", ["Samba", "Baião", "Frevo"]],
-		["Qual é o nome do personagem principal de O Rei Leão?", "Simba", ["Mufasa", "Timon", "Pumba"]],
-		["Quem conduz uma orquestra com uma batuta?", "Maestro", ["Pianista", "Violinista", "Cantor"]],
-		["Quem escreveu a peça O Avarento?", "Molière", ["Victor Hugo", "Albert Camus", "Émile Zola"]],
-		["Quem escreveu O Diário de Anne Frank?", "Anne Frank", ["J. K. Rowling", "Agatha Christie", "Virginia Woolf"]],
-	],
 }
 
 # ---------------------------------------------------------------- estado
@@ -202,6 +92,12 @@ var use_mouse := false
 var mouse_ratio := 0.5
 var t_anim := 0.0
 var novo_recorde := false
+var bank
+var drop_cd := 0.0
+var stall_t := 0.0
+var shake := 0.0
+var cam_base := Vector3.ZERO
+var dim_rect: ColorRect
 
 var modo_jogo := "padrao"
 var dificuldade := "normal"
@@ -239,6 +135,9 @@ func _ready() -> void:
 	win.content_scale_aspect = Window.CONTENT_SCALE_ASPECT_KEEP
 	win.content_scale_size = Vector2i(1280, 720)
 	hi = load_hi()
+	bank = QuizBankScript.new()
+	bank.load_json(QUESTIONS_PATH)
+	setup_input()
 	setup_sfx()
 	setup_env()
 	setup_world()
@@ -337,19 +236,22 @@ func setup_env() -> void:
 	add_child(we)
 
 	cam = Camera3D.new()
-	cam.fov = 60.0
-	cam.position = Vector3(0, -13, 21)
+	cam.fov = 48.0
+	cam.position = Vector3(0, -11.5, 27)
 	add_child(cam)
-	cam.look_at(Vector3(0, -1, 0), Vector3.UP)
+	cam.look_at(Vector3(0, -1.2, 0), Vector3.UP)
+	cam_base = cam.position
 
 	var sun := DirectionalLight3D.new()
-	sun.rotation_degrees = Vector3(15, 15, 0)
-	sun.light_energy = 0.8
+	sun.rotation_degrees = Vector3(-28, 18, 0)
+	sun.light_energy = 1.0
+	sun.shadow_enabled = true
+	sun.directional_shadow_max_distance = 70.0
 	add_child(sun)
 
 	ball_light = OmniLight3D.new()
-	ball_light.omni_range = 14.0
-	ball_light.light_energy = 2.0
+	ball_light.omni_range = 10.0
+	ball_light.light_energy = 1.2
 	ball_light.position = Vector3(0, PADDLE_Y, 3)
 	add_child(ball_light)
 
@@ -415,6 +317,7 @@ func new_ball(pos: Vector2, vel: Vector2, stuck: bool) -> Dictionary:
 		tn.mesh = sm
 		tn.material_override = tmat
 		tn.visible = false
+		tn.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		world.add_child(tn)
 		trail.append(tn)
 	return {"node": mi, "mat": bmat, "tmat": tmat, "trail": trail, "hist": [],
@@ -514,63 +417,11 @@ func build_bricks() -> void:
 	for br in bricks:
 		br.node.queue_free()
 	bricks.clear()
-	var dif: Dictionary = DIFS[dificuldade]
 	var total_w := COLS * BR_W + (COLS - 1) * BR_GAP
 	var x0 := -total_w / 2.0 + BR_W / 2.0
-	var padrao := (level - 1) % 5
-	var proc := -1
-	if modo_jogo == "random":
-		proc = randi() % 5
-	var chance: float = dif.densidade
-	var any_normal := false
-	for r in ROWS:
-		for c in COLS:
-			var on := true
-			if proc >= 0:
-				var xn := (c - (COLS - 1) / 2.0) / (COLS / 2.0)
-				var yn := float(r) / (ROWS - 1)
-				match proc:
-					0:
-						on = randf() < chance
-					1:
-						on = (xn * xn + (yn - 0.45) * (yn - 0.45) < 0.95) and randf() < minf(1.0, chance + 0.12)
-					2:
-						on = ((r + c + randi_range(0, 1)) % 3 != 0) and randf() < chance + 0.15
-					3:
-						on = ((r + randi_range(0, 2)) % 4 != 0) and randf() < minf(1.0, chance + 0.1)
-					_:
-						on = (absf(c - randi_range(2, COLS - 3)) <= (ROWS - r) * 0.9) and randf() < minf(1.0, chance + 0.2)
-			else:
-				match padrao:
-					0:
-						on = true
-					1:
-						on = (r + c) % 2 == 0 or r < 2
-					2:
-						on = absf(c - (COLS - 1) / 2.0) <= (ROWS - r) * 0.9
-					3:
-						on = not (c >= 3 and c <= 10 and r >= 2 and r <= 5)
-					_:
-						on = randf() < 0.75
-			var pos := Vector2(x0 + c * (BR_W + BR_GAP), 8.0 - r * 0.9)
-			if not on:
-				if proc >= 0:
-					var wo: int = dif.haz_obs
-					var wb: int = dif.haz_bomba
-					var tipo := "obstaculo" if randi() % (wo + wb) < wo else "bomba"
-					add_brick(tipo, pos, r, 1)
-				continue
-			var hp := 1
-			if level >= 2 and r < 2:
-				hp = 2
-			if level >= 4:
-				hp = 3 if r < 2 else (2 if r < 4 else 1)
-			var bonus_hp := 1 if (modo_jogo == "random" and level >= 3 and r < 2) else 0
-			hp = mini(4, hp + int(dif.vida_extra) + bonus_hp)
-			add_brick("normal", pos, r, hp)
-			any_normal = true
-	if not any_normal:
-		add_brick("normal", Vector2(0, 8.0), 0, 1 + int(dif.vida_extra))
+	for cell in LevelGenScript.generate(level, modo_jogo, DIFS[dificuldade]):
+		var pos := Vector2(x0 + int(cell.c) * (BR_W + BR_GAP), 8.0 - int(cell.r) * 0.9)
+		add_brick(cell.tipo, pos, cell.r, cell.hp)
 
 
 func clear_dynamic() -> void:
@@ -589,6 +440,7 @@ func load_level() -> void:
 	quiz = {}
 	freeze = 0.0
 	cooldown_laser = 0.0
+	stall_t = 0.0
 	reset_ball()
 
 
@@ -599,6 +451,8 @@ func start_game() -> void:
 	stats = {"total": 0, "acertos": 0, "por_cat": {}, "tempo": 0.0}
 	ultima_cat = ""
 	used.clear()
+	bank.revisit.clear()
+	drop_cd = 0.0
 	paddle_w = PADDLE_BASE_W
 	paddle.position.x = 0.0
 	load_level()
@@ -607,6 +461,7 @@ func start_game() -> void:
 
 func lose_life() -> void:
 	lives -= 1
+	shake = 0.6
 	sfx_play("vida")
 	active.clear()
 	clear_dynamic()
@@ -643,6 +498,7 @@ func hit_brick(br: Dictionary, destroy := false) -> void:
 		return
 	if br.tipo == "obstaculo":
 		return
+	stall_t = 0.0
 	if br.tipo == "bomba":
 		explode_bomb(br)
 		return
@@ -660,7 +516,9 @@ func hit_brick(br: Dictionary, destroy := false) -> void:
 	sfx_play("bloco")
 	burst(node.position, col, 12)
 	node.queue_free()
-	if randf() < DROP_CHANCE and drops.size() < MAX_DROPS:
+	shake = maxf(shake, 0.08)
+	if drop_cd <= 0.0 and randf() < DROP_CHANCE and drops.size() < MAX_DROPS:
+		drop_cd = DROP_COOLDOWN
 		spawn_drop(p)
 
 
@@ -678,6 +536,7 @@ func explode_bomb(b0: Dictionary) -> void:
 		for i in 3:
 			burst(Vector3(cp.x, cp.y, 0), palette[i], 9)
 		float_text("BOOM!", Vector3(cp.x, cp.y, 1.0), Color8(255, 150, 60))
+		shake = maxf(shake, 0.5)
 		for nb in bricks.duplicate():
 			var np: Vector2 = nb.pos
 			if cp.distance_to(np) > 2.3:
@@ -730,6 +589,7 @@ func burst(pos: Vector3, col: Color, n: int) -> void:
 		mi.mesh = bm
 		mi.material_override = m
 		mi.position = pos
+		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		world.add_child(mi)
 		fx.append({"node": mi, "life": 0.7,
 			"vel": Vector3(randf_range(-4, 4), randf_range(-3, 5), randf_range(1, 6))})
@@ -827,13 +687,14 @@ func step_ball(b: Dictionary, dt: float) -> bool:
 					pos.y = cc.y + signf(dd.y) * BALL_R
 				if is_obs:
 					sfx_play("duro")
+					vel = vel.rotated(deg_to_rad(randf_range(-3.0, 3.0)))
 				else:
 					hit_brick(chosen.br)
 
 		# raquete
 		if vel.y < 0.0 and pos.y - BALL_R <= PADDLE_Y + PADDLE_H * 0.5 and pos.y >= PADDLE_Y \
 				and absf(pos.x - paddle.position.x) <= paddle_w * 0.5 + BALL_R:
-			var off := clampf((pos.x - paddle.position.x) / (paddle_w * 0.5), -1.0, 1.0)
+			var off := clampf((pos.x - paddle.position.x) / (paddle_w * 0.5) + randf_range(-0.05, 0.05), -1.0, 1.0)
 			var ang := deg_to_rad(off * 60.0)
 			var sp := vel.length()
 			vel = Vector2(sin(ang), cos(ang)) * sp
@@ -890,10 +751,7 @@ func update_lasers(delta: float) -> void:
 
 func update_paddle(delta: float) -> void:
 	var dir := 0.0
-	if Input.is_key_pressed(KEY_LEFT) or Input.is_key_pressed(KEY_A):
-		dir -= 1.0
-	if Input.is_key_pressed(KEY_RIGHT) or Input.is_key_pressed(KEY_D):
-		dir += 1.0
+	dir = Input.get_axis("esq", "dir")
 	var spd := 18.0 * (0.55 if active.has("RAQUETE_LENTA") else 1.0)
 	var x := paddle.position.x
 	if dir != 0.0:
@@ -943,282 +801,8 @@ func update_drops(delta: float) -> void:
 
 
 # ---------------------------------------------------------------- perguntas
-func mk(cat: String, text: String, correct: String, wrongs: Array) -> Dictionary:
-	var opts: Array = [correct]
-	for w in wrongs:
-		if not opts.has(w) and opts.size() < 4:
-			opts.append(w)
-	var k := 1
-	while opts.size() < 4:
-		var alt := "Outra resposta %d" % k
-		if not opts.has(alt):
-			opts.append(alt)
-		k += 1
-	opts.shuffle()
-	return {"cat": cat, "text": text, "opts": opts, "correct": opts.find(correct), "ans": correct}
-
-
-func dist_int(c: int, minimo := -999999, extras: Array = []) -> Array:
-	var base := [1, -1, 2, -2, 10, -10, 3, -3, 5, -5]
-	base.shuffle()
-	var cands: Array = extras.duplicate()
-	for d in base:
-		cands.append(c + d)
-	var out: Array = []
-	for d in cands:
-		if d != c and not out.has(d) and d >= minimo:
-			out.append(d)
-		if out.size() == 3:
-			break
-	var k := 11
-	while out.size() < 3:
-		if not out.has(c + k):
-			out.append(c + k)
-		k += 1
-	return out
-
-
-func mk_int(cat: String, text: String, c: int, dist: Array, pre := "", suf := "") -> Dictionary:
-	var w: Array = []
-	for d in dist:
-		w.append(pre + str(d) + suf)
-	return mk(cat, text, pre + str(c) + suf, w)
-
-
-func q_aritmetica(n: int) -> Dictionary:
-	var lim := 20 + 30 * n
-	if randf() < 0.5:
-		var a := randi_range(5, lim)
-		var b := randi_range(5, lim)
-		return mk_int("Aritmética", "Quanto é %d + %d?" % [a, b], a + b, dist_int(a + b))
-	var a2 := randi_range(10, lim)
-	var b2 := randi_range(1, a2)
-	return mk_int("Aritmética", "Quanto é %d - %d?" % [a2, b2], a2 - b2, dist_int(a2 - b2, 0, [a2 + b2]))
-
-
-func q_tabuada(n: int) -> Dictionary:
-	var a := randi_range(2, mini(9 + n, 15))
-	var b := randi_range(2, 10)
-	var c := a * b
-	return mk_int("Tabuada", "Quanto é %d × %d?" % [a, b], c, dist_int(c, 0, [a * (b + 1), a * (b - 1), (a + 1) * b]))
-
-
-func q_divisao(n: int) -> Dictionary:
-	var b := randi_range(2, 9 + n / 2)
-	var q := randi_range(2, 12)
-	return mk_int("Divisão", "Quanto é %d ÷ %d?" % [b * q, b], q, dist_int(q, 1, [q + 1, q - 1, b]))
-
-
-func q_porcentagem(n: int) -> Dictionary:
-	var ps := [5, 10, 15, 20, 25, 50, 75]
-	var p: int = ps.pick_random()
-	var base := randi_range(1, 10 + n * 2) * 20
-	var c := base * p / 100
-	return mk_int("Porcentagem", "Quanto é %d%% de %d?" % [p, base], c, dist_int(c, 0, [c * 2, base - c, c + 10]))
-
-
-func q_equacao(n: int) -> Dictionary:
-	var x := randi_range(1 if n < 3 else -5, 10 + n)
-	if x == 0:
-		x = 2
-	var a := randi_range(2, 4 + n)
-	var b := randi_range(-10, 20)
-	var c := a * x + b
-	var sinal := "+" if b >= 0 else "-"
-	return mk_int("Equações", "Resolva: %dx %s %d = %d. Quanto vale x?" % [a, sinal, absi(b), c],
-		x, dist_int(x, -999999, [c - b, -x, x + 1]))
-
-
-func q_potencia(n: int) -> Dictionary:
-	var t := randi() % 3
-	if t == 0:
-		var a := randi_range(2, 10 + n)
-		return mk_int("Potências e Raízes", "Quanto é %d²?" % a, a * a, dist_int(a * a, 0, [2 * a, (a + 1) * (a + 1), a * a + a]))
-	if t == 1:
-		var a2 := randi_range(2, 5 + n / 2)
-		return mk_int("Potências e Raízes", "Quanto é %d³?" % a2, a2 * a2 * a2, dist_int(a2 * a2 * a2, 0, [3 * a2, a2 * a2, a2 * a2 * a2 + a2]))
-	var k := randi_range(2, 12 + n)
-	return mk_int("Potências e Raízes", "Qual é a raiz quadrada de %d?" % (k * k), k, dist_int(k, 1, [k * k / 2, k + 1, k - 1]))
-
-
-func gcd_i(a: int, b: int) -> int:
-	a = absi(a)
-	b = absi(b)
-	while b != 0:
-		var t := b
-		b = a % b
-		a = t
-	return maxi(1, a)
-
-
-func fr(n: int, d: int) -> Vector2i:
-	var g := gcd_i(n, d)
-	return Vector2i(n / g, d / g)
-
-
-func fr_str(f: Vector2i) -> String:
-	return str(f.x) if f.y == 1 else "%d/%d" % [f.x, f.y]
-
-
-func q_fracao(n: int) -> Dictionary:
-	var dens := [2, 3, 4, 5, 6, 8, 10]
-	var ops := ["+", "-"]
-	if n >= 3:
-		ops.append("×")
-	var a := 1
-	var b := 2
-	var c := 1
-	var d := 2
-	var op := "+"
-	var res := Vector2i(1, 1)
-	var wrong := Vector2i(1, 1)
-	while true:
-		b = dens.pick_random()
-		a = mini(randi_range(1, 9), b - 1)
-		d = dens.pick_random()
-		c = mini(randi_range(1, 9), d - 1)
-		op = ops.pick_random()
-		if op == "-" and a * d < c * b:
-			var ta := a
-			var tb := b
-			a = c
-			b = d
-			c = ta
-			d = tb
-		if op == "+":
-			res = fr(a * d + c * b, b * d)
-			wrong = fr(a + c, b + d)
-		elif op == "-":
-			res = fr(a * d - c * b, b * d)
-			wrong = fr(maxi(1, absi(a - c)), maxi(1, absi(b - d)))
-		else:
-			res = fr(a * c, b * d)
-			wrong = fr(a * d, b * c)
-		if res.x > 0:
-			break
-	var cands: Array = [wrong, fr(res.x + 1, res.y), fr(res.x * 2, res.y), fr(res.y, res.x)]
-	if res.x - 1 > 0:
-		cands.append(fr(res.x - 1, res.y))
-	for k in [1, 2, 3]:
-		cands.append(fr(res.x + 7 * k * res.y, res.y))
-	var w: Array = []
-	for f in cands:
-		var s := fr_str(f)
-		if f != res and not w.has(s):
-			w.append(s)
-	return mk("Frações", "Quanto é %d/%d %s %d/%d? (forma simplificada)" % [a, b, op, c, d], fr_str(res), w)
-
-
-func q_expressao(n: int) -> Dictionary:
-	var a := randi_range(2, 10 + n)
-	var b := randi_range(2, 9)
-	var c := randi_range(2, 9)
-	var t := randi() % 3
-	if t == 0:
-		return mk_int("Expressões", "Quanto é %d + %d × %d?" % [a, b, c], a + b * c, dist_int(a + b * c, 0, [(a + b) * c]))
-	if t == 1:
-		return mk_int("Expressões", "Quanto é (%d + %d) × %d?" % [a, b, c], (a + b) * c, dist_int((a + b) * c, 0, [a + b * c]))
-	return mk_int("Expressões", "Quanto é %d × %d - %d?" % [a, b, c], a * b - c, dist_int(a * b - c, -999999, [a * (b - c)]))
-
-
-func q_sequencia(n: int) -> Dictionary:
-	var termos: Array = []
-	var prox := 0
-	var extras: Array = []
-	if n < 2 or randf() < 0.6:
-		var s := randi_range(1, 20)
-		var r := randi_range(2, 5 + n)
-		for i in 4:
-			termos.append(s + i * r)
-		prox = s + 4 * r
-		extras = [prox + r, prox - 1, prox + 1]
-	else:
-		var s2 := randi_range(1, 5)
-		var r2: int = [2, 3].pick_random()
-		for i in 4:
-			termos.append(s2 * int(pow(r2, i)))
-		prox = s2 * int(pow(r2, 4))
-		var last: int = termos[3]
-		var prev: int = termos[2]
-		extras = [last + (last - prev), prox + r2, prox * r2]
-	var seq := ", ".join(termos.map(func(v): return str(v)))
-	return mk_int("Sequências", "Qual é o próximo número da sequência: %s, ...?" % seq, prox, dist_int(prox, 0, extras))
-
-
-func q_problema(n: int) -> Dictionary:
-	var t := randi() % 7
-	match t:
-		0:
-			var a := randi_range(3, 9 + n)
-			var b := randi_range(4, 12)
-			return mk_int("Problemas", "Uma farmácia recebeu %d caixas com %d remédios cada. Quantos remédios ao todo?" % [a, b],
-				a * b, dist_int(a * b, 0, [a + b, a * b + b]))
-		1:
-			var a := randi_range(20, 60 + 10 * n)
-			var b := randi_range(5, a - 1)
-			return mk_int("Problemas", "Ana tinha %d figurinhas e deu %d ao irmão. Com quantas ela ficou?" % [a, b],
-				a - b, dist_int(a - b, 0, [a + b]))
-		2:
-			var ds := [10, 20, 25, 50]
-			var p := randi_range(2, 15) * 20
-			var d: int = ds.pick_random()
-			var novo := p - p * d / 100
-			return mk_int("Problemas", "Um tênis custa R$ %d e está com %d%% de desconto. Qual é o novo preço?" % [p, d],
-				novo, dist_int(novo, 0, [p * d / 100, p - d]), "R$ ")
-		3:
-			var k := randi_range(2, 8)
-			var q := randi_range(3, 12)
-			return mk_int("Problemas", "%d amigos dividiram %d balas igualmente. Quantas balas cada um recebeu?" % [k, k * q],
-				q, dist_int(q, 1, [k * q - k, q + k]))
-		4:
-			var vs := [40, 50, 60, 80, 90, 100]
-			var v: int = vs.pick_random()
-			var h := randi_range(2, 5)
-			return mk_int("Problemas", "Um carro anda a %d km/h. Quantos km ele percorre em %d horas?" % [v, h],
-				v * h, dist_int(v * h, 0, [v + h, v * (h - 1)]), "", " km")
-		_:
-			var l := randi_range(3, 12)
-			var c := randi_range(3, 15)
-			if t == 5:
-				return mk_int("Problemas", "Um retângulo mede %d m por %d m. Qual é a sua área?" % [l, c],
-					l * c, dist_int(l * c, 0, [2 * (l + c), l + c]), "", " m²")
-			return mk_int("Problemas", "Um retângulo mede %d m por %d m. Qual é o seu perímetro?" % [l, c],
-				2 * (l + c), dist_int(2 * (l + c), 0, [l * c, l + c]), "", " m")
-
-
-func gen_from(entry: Array) -> Dictionary:
-	if str(entry[1]) != "":
-		return call(str(entry[1]), level)
-	var cat: String = entry[0]
-	var e: Array = (GERAIS[cat] as Array).pick_random()
-	return mk(cat, e[0], e[1], e[2])
-
-
 func pick_question() -> Dictionary:
-	var opts: Array = []
-	for m in MATERIAS:
-		if not materias_sel.has(m):
-			continue
-		if m == "Matemática":
-			for g in MATH_GENS:
-				opts.append([g[0], g[1]])
-		else:
-			opts.append([m, ""])
-	if opts.is_empty():
-		for g in MATH_GENS:
-			opts.append([g[0], g[1]])
-	var cats: Array = []
-	for o in opts:
-		if o[0] != ultima_cat:
-			cats.append(o)
-	if cats.is_empty():
-		cats = opts
-	for _i in 20:
-		var q := gen_from(cats.pick_random())
-		var qid := "%s|%s|%s" % [q.cat, q.text, "/".join(q.opts)]
-		if not used.has(qid):
-			return q
-	return gen_from(cats.pick_random())
+	return bank.pick(materias_sel, ultima_cat, used, level)
 
 
 # ---------------------------------------------------------------- quiz
@@ -1233,7 +817,8 @@ func open_quiz(tipo: String) -> void:
 	quiz_answered = false
 	quiz_fb = 0.0
 	var info: Dictionary = BOOSTS[tipo]
-	quiz_cat.text = "QUESTIONÁRIO  •  %s" % String(quiz.cat).to_upper()
+	var tag := "REVISÃO" if quiz.get("revisao", false) else "QUESTIONÁRIO"
+	quiz_cat.text = "%s  •  %s" % [tag, String(quiz.cat).to_upper()]
 	quiz_sub.text = "Acerte e ganhe: %s — %s" % [info.nome, info.desc]
 	quiz_sub.modulate = info.cor
 	quiz_text.text = quiz.text
@@ -1271,6 +856,7 @@ func answer(i: int) -> void:
 		quiz_fb_label.modulate = Color8(90, 230, 130)
 		sfx_play("certo")
 	else:
+		bank.note_wrong(quiz)
 		if i >= 0:
 			quiz_buttons[i].modulate = Color8(240, 90, 90)
 		var keys := DOWNGRADES.keys()
@@ -1306,7 +892,8 @@ func apply_boost(tipo: String) -> void:
 			var sp := ball_speed()
 			for deg in [-30.0, 30.0]:
 				var a := deg_to_rad(deg)
-				balls.append(new_ball(src, Vector2(sin(a), cos(a)) * sp, false))
+				if balls.size() < MAX_BALLS:
+					balls.append(new_ball(src, Vector2(sin(a), cos(a)) * sp, false))
 		"VIDA":
 			lives = mini(9, lives + 1)
 		_:
@@ -1318,14 +905,27 @@ func apply_boost(tipo: String) -> void:
 func set_state(s: String) -> void:
 	state = s
 	world.visible = s in ["JOGANDO", "QUIZ", "PAUSA", "NIVEL"]
-	menu_box.visible = s in ["MENU", "SELECAO_MODO", "SELECAO_DIFICULDADE", "SELECAO_QUIZ"]
+	menu_box.visible = s in ["MENU", "AJUDA", "SELECAO_MODO", "SELECAO_DIFICULDADE", "SELECAO_QUIZ"]
+	var a := 0.0
+	match s:
+		"QUIZ":
+			a = 0.7
+		"PAUSA", "NIVEL":
+			a = 0.55
+		"FIM":
+			a = 0.7
+		"MENU", "AJUDA", "SELECAO_MODO", "SELECAO_DIFICULDADE", "SELECAO_QUIZ":
+			a = 0.55
+	dim_rect.color.a = a
 	quiz_box.visible = s == "QUIZ"
 	if menu_box.visible:
 		call_deferred("rebuild_menu")
 
 
 func _process(delta: float) -> void:
+	delta = minf(delta, 1.0 / 30.0)
 	t_anim += delta
+	update_shake(delta)
 	update_fx(delta)
 	update_hud()
 	match state:
@@ -1352,6 +952,15 @@ func _process(delta: float) -> void:
 
 
 func update_game(delta: float) -> void:
+	drop_cd -= delta
+	if freeze <= 0.0 and not any_stuck():
+		stall_t += delta
+		if stall_t > STALL_LIMIT:
+			stall_t = STALL_LIMIT - 3.0
+			for sb in balls:
+				if not sb.stuck:
+					var sv: Vector2 = sb.vel
+					sb.vel = sv.rotated(deg_to_rad(randf_range(-30.0, 30.0)))
 	for k in active.keys():
 		active[k] = float(active[k]) - delta
 		if float(active[k]) <= 0.0:
@@ -1362,7 +971,7 @@ func update_game(delta: float) -> void:
 	update_paddle(delta)
 
 	cooldown_laser -= delta
-	if active.has("LASER") and Input.is_key_pressed(KEY_SPACE) and cooldown_laser <= 0.0 and not any_stuck():
+	if active.has("LASER") and Input.is_action_pressed("lancar") and cooldown_laser <= 0.0 and not any_stuck():
 		fire_laser()
 	update_lasers(delta)
 
@@ -1428,6 +1037,8 @@ func update_game(delta: float) -> void:
 		bricks.clear()
 		level_bonus = lives * 100 * level
 		score += level_bonus
+		hi = maxi(hi, score)
+		save_hi()
 		level_timer = 2.5
 		sfx_play("nivel")
 		set_state("NIVEL")
@@ -1504,6 +1115,12 @@ func build_ui() -> void:
 	var cl := CanvasLayer.new()
 	add_child(cl)
 
+	dim_rect = ColorRect.new()
+	dim_rect.color = Color(0, 0, 0, 0.0)
+	dim_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	cl.add_child(dim_rect)
+	dim_rect.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+
 	hud_label = make_label(22)
 	hud_label.position = Vector2(20, 12)
 	cl.add_child(hud_label)
@@ -1531,6 +1148,7 @@ func build_ui() -> void:
 	quiz_box.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	var panel := PanelContainer.new()
 	panel.custom_minimum_size = Vector2(800, 0)
+	panel.add_theme_stylebox_override("panel", panel_style())
 	quiz_box.add_child(panel)
 	var mg := MarginContainer.new()
 	for s in ["left", "top", "right", "bottom"]:
@@ -1582,6 +1200,7 @@ func build_ui() -> void:
 	cl.add_child(menu_box)
 	menu_box.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	var mpanel := PanelContainer.new()
+	mpanel.add_theme_stylebox_override("panel", panel_style())
 	menu_box.add_child(mpanel)
 	var mmg := MarginContainer.new()
 	for s in ["left", "top", "right", "bottom"]:
@@ -1633,7 +1252,19 @@ func rebuild_menu() -> void:
 		"MENU":
 			mlabel("BREAKOUT GENIUS", 46, gold)
 			mlabel("MATEMÁTICA + CONHECIMENTOS GERAIS", 24, cyan)
-			mlabel("Quebre os blocos, pegue as cápsulas e resolva a questão sorteada para ganhar o boost!", 16)
+			mlabel("Quebre os blocos, pegue as cápsulas e resolva a questão para ganhar o boost!", 17)
+			mlabel("", 8)
+			mlabel("MODO: %s   •   DIFICULDADE: %s" % [("Padrão" if modo_jogo == "padrao" else "Random"), DIFS[dificuldade].nome], 18, cyan)
+			mlabel("QUIZ: " + materias_text(), 16)
+			mlabel("RECORDE: %d" % hi, 20, gold)
+			mlabel("", 8)
+			var jb := mbutton("JOGAR", func(): set_state("SELECAO_MODO"), 280.0)
+			mbutton("COMO JOGAR", func(): set_state("AJUDA"), 280.0)
+			mlabel("← → / A D / mouse: mover  •  ESPAÇO: lançar / laser  •  P: pausa", 15, grey)
+			jb.grab_focus()
+		"AJUDA":
+			mlabel("COMO JOGAR", 36, gold)
+			mlabel("Pegue as cápsulas que caem dos blocos e responda ao quiz para ganhar o boost.", 16)
 			mlabel("BOOSTS", 20, gold)
 			var grid := GridContainer.new()
 			grid.columns = 2
@@ -1649,14 +1280,10 @@ func rebuild_menu() -> void:
 			mlabel("QUESTIONÁRIOS", 20, gold)
 			mlabel("Aritmética • Tabuada • Divisão • Porcentagem • Equações\nPotências e Raízes • Frações • Expressões • Sequências • Problemas", 15)
 			mlabel("Conhecimentos gerais: Geografia • Ciências • História • Cultura", 15)
-			mlabel("Errou ou o tempo acabou? Recebe um downgrade por 8 segundos.", 15, Color8(240, 90, 90))
+			mlabel("Errou ou o tempo acabou? Downgrade por 8 s, e a matéria volta depois como REVISÃO.", 15, Color8(240, 90, 90))
 			mlabel("Blocos cinza = obstáculos indestrutíveis  •  Blocos vermelhos = bombas (explosão em cadeia)", 15, grey)
-			mlabel("MODO: %s   •   DIFICULDADE: %s" % [("Padrão" if modo_jogo == "padrao" else "Random"), DIFS[dificuldade].nome], 17, cyan)
-			mlabel("QUIZ: " + materias_text(), 15)
-			mlabel("← → / A D / mouse: mover  •  ESPAÇO: lançar / laser  •  1-4: responder  •  P: pausa", 15, grey)
-			mlabel("RECORDE: %d" % hi, 18, cyan)
-			var jb := mbutton("JOGAR", func(): set_state("SELECAO_MODO"), 260.0)
-			jb.grab_focus()
+			mlabel("Mover: ← → / A D / mouse / direcional  •  Lançar e atirar: ESPAÇO / botão A  •  Responder: 1-4  •  Pausa: P", 15, grey)
+			mbutton("VOLTAR", func(): set_state("MENU"), 240.0).grab_focus()
 		"SELECAO_MODO":
 			mlabel("ESCOLHA O MODO DE JOGO", 30)
 			var b1 := mbutton("1)  Padrão — fases clássicas em sequência", func(): choose_modo("padrao"))
@@ -1740,6 +1367,9 @@ func on_primary() -> void:
 
 
 func _input(event: InputEvent) -> void:
+	if state == "JOGANDO" and event.is_action_pressed("lancar"):
+		on_primary()
+		return
 	if event is InputEventMouseMotion:
 		mouse_ratio = (event as InputEventMouseMotion).position.x / get_viewport().get_visible_rect().size.x
 		use_mouse = true
@@ -1760,6 +1390,9 @@ func _input(event: InputEvent) -> void:
 		"MENU":
 			if k == KEY_ESCAPE:
 				get_tree().quit()
+		"AJUDA":
+			if k == KEY_ESCAPE:
+				set_state("MENU")
 		"SELECAO_MODO":
 			if dg == 1:
 				choose_modo("padrao")
@@ -1780,9 +1413,7 @@ func _input(event: InputEvent) -> void:
 			elif k == KEY_ESCAPE:
 				set_state("SELECAO_DIFICULDADE")
 		"JOGANDO":
-			if k == KEY_SPACE:
-				on_primary()
-			elif k == KEY_P or k == KEY_ESCAPE:
+			if k == KEY_P or k == KEY_ESCAPE:
 				set_state("PAUSA")
 		"QUIZ":
 			if not quiz_answered:
@@ -1803,3 +1434,49 @@ func _input(event: InputEvent) -> void:
 				set_state("MENU")
 			elif k == KEY_ESCAPE:
 				get_tree().quit()
+
+
+
+# ---------------------------------------------------------------- extras
+func setup_input() -> void:
+	add_input("esq", [KEY_LEFT, KEY_A], JOY_AXIS_LEFT_X, -1.0)
+	add_input("dir", [KEY_RIGHT, KEY_D], JOY_AXIS_LEFT_X, 1.0)
+	add_input("lancar", [KEY_SPACE], -1, 0.0, JOY_BUTTON_A)
+
+
+func add_input(nome: String, keys: Array, axis := -1, axis_val := 0.0, btn := -1) -> void:
+	if not InputMap.has_action(nome):
+		InputMap.add_action(nome, 0.3)
+	for k in keys:
+		var e := InputEventKey.new()
+		e.physical_keycode = int(k) as Key
+		InputMap.action_add_event(nome, e)
+	if axis >= 0:
+		var j := InputEventJoypadMotion.new()
+		j.axis = axis as JoyAxis
+		j.axis_value = axis_val
+		InputMap.action_add_event(nome, j)
+	if btn >= 0:
+		var jb := InputEventJoypadButton.new()
+		jb.button_index = btn as JoyButton
+		InputMap.action_add_event(nome, jb)
+
+
+func update_shake(delta: float) -> void:
+	shake = maxf(0.0, shake - delta * 2.5)
+	cam.position = cam_base + Vector3(randf_range(-1.0, 1.0), randf_range(-1.0, 1.0), 0.0) * shake * 0.35
+
+
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_WM_CLOSE_REQUEST:
+		hi = maxi(hi, score)
+		save_hi()
+
+
+func panel_style() -> StyleBoxFlat:
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = Color8(22, 22, 44, 250)
+	sb.border_color = Color8(100, 140, 210)
+	sb.set_border_width_all(2)
+	sb.set_corner_radius_all(14)
+	return sb

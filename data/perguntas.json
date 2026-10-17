@@ -1,0 +1,892 @@
+{
+	"Ciências": [
+		[
+			"Qual é a fórmula química da água?",
+			"H₂O",
+			[
+				"CO₂",
+				"O₂",
+				"NaCl"
+			]
+		],
+		[
+			"Qual planeta é conhecido como planeta vermelho?",
+			"Marte",
+			[
+				"Vênus",
+				"Júpiter",
+				"Mercúrio"
+			]
+		],
+		[
+			"Qual gás as plantas absorvem principalmente na fotossíntese?",
+			"Dióxido de carbono",
+			[
+				"Oxigênio",
+				"Hidrogênio",
+				"Hélio"
+			]
+		],
+		[
+			"Qual é a unidade de medida da corrente elétrica?",
+			"Ampere",
+			[
+				"Volt",
+				"Watt",
+				"Ohm"
+			]
+		],
+		[
+			"Qual é o símbolo químico do ouro?",
+			"Au",
+			[
+				"Ag",
+				"Fe",
+				"O"
+			]
+		],
+		[
+			"Qual gás é mais abundante na atmosfera terrestre?",
+			"Nitrogênio",
+			[
+				"Oxigênio",
+				"Dióxido de carbono",
+				"Hidrogênio"
+			]
+		],
+		[
+			"Quantas câmaras tem o coração humano?",
+			"Quatro",
+			[
+				"Duas",
+				"Três",
+				"Cinco"
+			]
+		],
+		[
+			"A que temperatura a água congela ao nível do mar?",
+			"0 °C",
+			[
+				"-10 °C",
+				"10 °C",
+				"32 °C"
+			]
+		],
+		[
+			"Qual é a unidade de medida de força no Sistema Internacional?",
+			"Newton",
+			[
+				"Joule",
+				"Pascal",
+				"Watt"
+			]
+		],
+		[
+			"Qual destes animais é um mamífero?",
+			"Golfinho",
+			[
+				"Tubarão",
+				"Polvo",
+				"Truta"
+			]
+		],
+		[
+			"Qual é o órgão responsável pela circulação sanguínea?",
+			"Coração",
+			[
+				"Pulmão",
+				"Fígado",
+				"Rim"
+			]
+		],
+		[
+			"Qual é o processo pelo qual a água passa do estado líquido para o gasoso?",
+			"Evaporação",
+			[
+				"Condensação",
+				"Solidificação",
+				"Liquefação"
+			]
+		],
+		[
+			"Qual é a camada mais externa da Terra?",
+			"Crosta",
+			[
+				"Manto",
+				"Núcleo",
+				"Mesosfera"
+			]
+		],
+		[
+			"Qual parte da célula contém o material genético?",
+			"Núcleo",
+			[
+				"Membrana",
+				"Mitocôndria",
+				"Ribossomo"
+			]
+		],
+		[
+			"Qual é o gás liberado pelos seres vivos na respiração?",
+			"Dióxido de carbono",
+			[
+				"Oxigênio",
+				"Nitrogênio",
+				"Hidrogênio"
+			]
+		],
+		[
+			"Qual elemento químico possui o símbolo Na?",
+			"Sódio",
+			[
+				"Nióbio",
+				"Níquel",
+				"Neônio"
+			]
+		],
+		[
+			"Qual é a menor unidade viva?",
+			"Célula",
+			[
+				"Átomo",
+				"Molécula",
+				"Tecido"
+			]
+		],
+		[
+			"Qual tipo de energia é armazenada em um objeto elevado?",
+			"Energia potencial gravitacional",
+			[
+				"Energia térmica",
+				"Energia cinética",
+				"Energia química"
+			]
+		],
+		[
+			"Qual é a unidade de medida de pressão?",
+			"Pascal",
+			[
+				"Volt",
+				"Ohm",
+				"Ampere"
+			]
+		],
+		[
+			"Qual é o nome do processo de formação das plantas a partir de sementes?",
+			"Germinação",
+			[
+				"Fotossíntese",
+				"Respiração",
+				"Polinização"
+			]
+		],
+		[
+			"Qual é o maior órgão do corpo humano?",
+			"Pele",
+			[
+				"Fígado",
+				"Pulmão",
+				"Coração"
+			]
+		],
+		[
+			"Qual gás é usado em muitos extintores de incêndio?",
+			"Dióxido de carbono",
+			[
+				"Hélio",
+				"Hidrogênio",
+				"Oxigênio"
+			]
+		],
+		[
+			"Qual é a causa da formação das marés?",
+			"A atração da Lua",
+			[
+				"O movimento das estrelas",
+				"A temperatura do oceano",
+				"O vento"
+			]
+		],
+		[
+			"Qual é o nome da molécula que transporta energia na célula?",
+			"ATP",
+			[
+				"DNA",
+				"RNA",
+				"ADP"
+			]
+		],
+		[
+			"Qual tipo de ondas os celulares usam para transmitir sinais?",
+			"Ondas eletromagnéticas",
+			[
+				"Ondas sonoras",
+				"Ondas térmicas",
+				"Ondas gravitacionais"
+			]
+		]
+	],
+	"Cultura": [
+		[
+			"Quem pintou a Mona Lisa?",
+			"Leonardo da Vinci",
+			[
+				"Michelangelo",
+				"Vincent van Gogh",
+				"Pablo Picasso"
+			]
+		],
+		[
+			"Quem escreveu o romance Dom Casmurro?",
+			"Machado de Assis",
+			[
+				"José de Alencar",
+				"Clarice Lispector",
+				"Carlos Drummond de Andrade"
+			]
+		],
+		[
+			"Qual é o idioma oficial do Brasil?",
+			"Português",
+			[
+				"Espanhol",
+				"Francês",
+				"Italiano"
+			]
+		],
+		[
+			"Qual instrumento musical tem teclas, cordas e martelos?",
+			"Piano",
+			[
+				"Flauta",
+				"Trompete",
+				"Violino"
+			]
+		],
+		[
+			"Quem criou a personagem Harry Potter?",
+			"J. K. Rowling",
+			[
+				"Suzanne Collins",
+				"C. S. Lewis",
+				"Agatha Christie"
+			]
+		],
+		[
+			"Qual estilo musical brasileiro está ligado ao desfile de escolas no Carnaval?",
+			"Samba",
+			[
+				"Fado",
+				"Tango",
+				"Flamenco"
+			]
+		],
+		[
+			"Quantos anéis aparecem no símbolo dos Jogos Olímpicos?",
+			"Cinco",
+			[
+				"Quatro",
+				"Seis",
+				"Sete"
+			]
+		],
+		[
+			"Qual destes instrumentos pertence à família das cordas?",
+			"Violão",
+			[
+				"Clarinete",
+				"Trombone",
+				"Tímpano"
+			]
+		],
+		[
+			"Quem escreveu o livro O Pequeno Príncipe?",
+			"Antoine de Saint-Exupéry",
+			[
+				"Jules Verne",
+				"Luís de Camões",
+				"George Orwell"
+			]
+		],
+		[
+			"Qual festa popular brasileira tem desfile de escolas de samba?",
+			"Carnaval",
+			[
+				"Festa Junina",
+				"Oktoberfest",
+				"Círio de Nazaré"
+			]
+		],
+		[
+			"Quem compôs o Hino Nacional Brasileiro?",
+			"Francisco Manuel da Silva",
+			[
+				"Heitor Villa-Lobos",
+				"Tom Jobim",
+				"Carlos Gomes"
+			]
+		],
+		[
+			"Qual festival de música acontece no Rio de Janeiro desde 1985?",
+			"Rock in Rio",
+			[
+				"Lollapalooza",
+				"Tomorrowland",
+				"Coachella"
+			]
+		],
+		[
+			"Quem foi o escritor de A Divina Comédia?",
+			"Dante Alighieri",
+			[
+				"William Shakespeare",
+				"Miguel de Cervantes",
+				"Friedrich Nietzsche"
+			]
+		],
+		[
+			"Qual destes artistas pintou Guernica?",
+			"Pablo Picasso",
+			[
+				"Vincent van Gogh",
+				"Claude Monet",
+				"Leonardo da Vinci"
+			]
+		],
+		[
+			"Qual instrumento de cordas é o mais agudo da orquestra?",
+			"Violino",
+			[
+				"Viola",
+				"Violoncelo",
+				"Contrabaixo"
+			]
+		],
+		[
+			"A qual movimento literário pertence Dom Casmurro?",
+			"Realismo",
+			[
+				"Romantismo",
+				"Modernismo",
+				"Barroco"
+			]
+		],
+		[
+			"Quem escreveu a obra O Alienista?",
+			"Machado de Assis",
+			[
+				"Érico Veríssimo",
+				"Clarice Lispector",
+				"Graciliano Ramos"
+			]
+		],
+		[
+			"Qual teatro de Manaus é famoso por sua cúpula colorida?",
+			"Teatro Amazonas",
+			[
+				"Teatro Municipal do Rio de Janeiro",
+				"Teatro da Paz",
+				"Teatro Nacional"
+			]
+		],
+		[
+			"Quem criou a personagem Capitão América?",
+			"Joe Simon e Jack Kirby",
+			[
+				"Stan Lee",
+				"Steve Ditko",
+				"Alan Moore"
+			]
+		],
+		[
+			"Qual gênero musical é associado à dança do tango?",
+			"Tango",
+			[
+				"Samba",
+				"Baião",
+				"Frevo"
+			]
+		],
+		[
+			"Qual é o nome do personagem principal de O Rei Leão?",
+			"Simba",
+			[
+				"Mufasa",
+				"Timon",
+				"Pumba"
+			]
+		],
+		[
+			"Quem conduz uma orquestra com uma batuta?",
+			"Maestro",
+			[
+				"Pianista",
+				"Violinista",
+				"Cantor"
+			]
+		],
+		[
+			"Quem escreveu a peça O Avarento?",
+			"Molière",
+			[
+				"Victor Hugo",
+				"Albert Camus",
+				"Émile Zola"
+			]
+		],
+		[
+			"Quem escreveu O Diário de Anne Frank?",
+			"Anne Frank",
+			[
+				"J. K. Rowling",
+				"Agatha Christie",
+				"Virginia Woolf"
+			]
+		]
+	],
+	"Geografia": [
+		[
+			"Qual é a capital da Austrália?",
+			"Canberra",
+			[
+				"Sydney",
+				"Melbourne",
+				"Perth"
+			]
+		],
+		[
+			"Qual é o maior estado brasileiro em área?",
+			"Amazonas",
+			[
+				"Pará",
+				"Mato Grosso",
+				"Minas Gerais"
+			]
+		],
+		[
+			"Qual é o maior oceano da Terra?",
+			"Oceano Pacífico",
+			[
+				"Oceano Atlântico",
+				"Oceano Índico",
+				"Oceano Ártico"
+			]
+		],
+		[
+			"Qual rio é tradicionalmente associado ao Egito?",
+			"Rio Nilo",
+			[
+				"Rio Amazonas",
+				"Rio Danúbio",
+				"Rio Ganges"
+			]
+		],
+		[
+			"Qual é a capital do Japão?",
+			"Tóquio",
+			[
+				"Osaka",
+				"Quioto",
+				"Hiroshima"
+			]
+		],
+		[
+			"Qual é o maior deserto do mundo?",
+			"Antártida",
+			[
+				"Saara",
+				"Gobi",
+				"Atacama"
+			]
+		],
+		[
+			"Em qual cordilheira fica o Monte Everest?",
+			"Himalaia",
+			[
+				"Andes",
+				"Alpes",
+				"Montanhas Rochosas"
+			]
+		],
+		[
+			"Qual país tem formato de uma bota e fica no sul da Europa?",
+			"Itália",
+			[
+				"Grécia",
+				"Portugal",
+				"Croácia"
+			]
+		],
+		[
+			"Qual é a capital da França?",
+			"Paris",
+			[
+				"Marselha",
+				"Lyon",
+				"Nantes"
+			]
+		],
+		[
+			"Qual é o menor país do mundo?",
+			"Vaticano",
+			[
+				"Mônaco",
+				"São Marino",
+				"Liechtenstein"
+			]
+		],
+		[
+			"Em qual continente fica o deserto do Saara?",
+			"África",
+			[
+				"Ásia",
+				"Europa",
+				"América"
+			]
+		],
+		[
+			"Qual país é conhecido como a Terra do Sol Nascente?",
+			"Japão",
+			[
+				"China",
+				"Coreia do Sul",
+				"Tailândia"
+			]
+		],
+		[
+			"Qual é a capital da Argentina?",
+			"Buenos Aires",
+			[
+				"Rosário",
+				"Córdoba",
+				"Montevidéu"
+			]
+		],
+		[
+			"Qual é a capital do Canadá?",
+			"Ottawa",
+			[
+				"Toronto",
+				"Montreal",
+				"Vancouver"
+			]
+		],
+		[
+			"Qual é a capital do Uruguai?",
+			"Montevidéu",
+			[
+				"Assunção",
+				"Santiago",
+				"Lima"
+			]
+		],
+		[
+			"Qual é o rio mais longo do mundo?",
+			"Rio Amazonas",
+			[
+				"Rio Nilo",
+				"Rio Yangtzé",
+				"Rio Mississipi"
+			]
+		],
+		[
+			"Qual é a capital da Noruega?",
+			"Oslo",
+			[
+				"Estocolmo",
+				"Copenhague",
+				"Helsinque"
+			]
+		],
+		[
+			"Qual país tem a maior extensão territorial da América do Sul?",
+			"Brasil",
+			[
+				"Argentina",
+				"Peru",
+				"Colômbia"
+			]
+		],
+		[
+			"Em qual país fica a cidade de Lisboa?",
+			"Portugal",
+			[
+				"Espanha",
+				"Itália",
+				"França"
+			]
+		],
+		[
+			"Qual é a capital do México?",
+			"Cidade do México",
+			[
+				"Guadalajara",
+				"Monterrei",
+				"Cancún"
+			]
+		],
+		[
+			"Qual é o ponto mais alto do Brasil?",
+			"Pico da Neblina",
+			[
+				"Pico Paraná",
+				"Monte Roraima",
+				"Pico dos Órgãos"
+			]
+		],
+		[
+			"Qual estado brasileiro fica na região Nordeste?",
+			"Bahia",
+			[
+				"Acre",
+				"Rio Grande do Sul",
+				"Pará"
+			]
+		],
+		[
+			"Qual é a maior ilha do mundo?",
+			"Groenlândia",
+			[
+				"Madagáscar",
+				"Bornéu",
+				"Nova Guiné"
+			]
+		],
+		[
+			"Qual cidade fica na margem do Rio Tâmisa?",
+			"Londres",
+			[
+				"Paris",
+				"Berlim",
+				"Madri"
+			]
+		],
+		[
+			"Qual é a capital do Chile?",
+			"Santiago",
+			[
+				"Valparaíso",
+				"Lima",
+				"Bogotá"
+			]
+		]
+	],
+	"História": [
+		[
+			"Em que ano foi proclamada a Independência do Brasil?",
+			"1822",
+			[
+				"1500",
+				"1889",
+				"1922"
+			]
+		],
+		[
+			"Em que ano foi abolida a escravidão no Brasil?",
+			"1888",
+			[
+				"1822",
+				"1850",
+				"1889"
+			]
+		],
+		[
+			"Em que ano terminou a Segunda Guerra Mundial?",
+			"1945",
+			[
+				"1918",
+				"1939",
+				"1950"
+			]
+		],
+		[
+			"Qual cidade-estado grega é associada ao nascimento da democracia?",
+			"Atenas",
+			[
+				"Esparta",
+				"Corinto",
+				"Tebas"
+			]
+		],
+		[
+			"Em que ano os portugueses chegaram ao território que hoje é o Brasil?",
+			"1500",
+			[
+				"1492",
+				"1530",
+				"1600"
+			]
+		],
+		[
+			"Em que ano começou a Revolução Francesa?",
+			"1789",
+			[
+				"1689",
+				"1815",
+				"1848"
+			]
+		],
+		[
+			"Qual civilização construiu Machu Picchu?",
+			"Inca",
+			[
+				"Maia",
+				"Asteca",
+				"Olmeca"
+			]
+		],
+		[
+			"Quem foi o primeiro ser humano a pisar na Lua?",
+			"Neil Armstrong",
+			[
+				"Yuri Gagarin",
+				"Buzz Aldrin",
+				"Alan Shepard"
+			]
+		],
+		[
+			"Quem foi o presidente dos Estados Unidos durante a Guerra de Secessão?",
+			"Abraham Lincoln",
+			[
+				"George Washington",
+				"Ulysses S. Grant",
+				"Thomas Jefferson"
+			]
+		],
+		[
+			"Em que ano ocorreu a Proclamação da República no Brasil?",
+			"1889",
+			[
+				"1879",
+				"1900",
+				"1892"
+			]
+		],
+		[
+			"Qual foi a primeira vila fundada pelos portugueses no Brasil, em 1532?",
+			"São Vicente",
+			[
+				"Salvador",
+				"Rio de Janeiro",
+				"Recife"
+			]
+		],
+		[
+			"Quem assinou a Lei Áurea, que aboliu a escravidão no Brasil?",
+			"Princesa Isabel",
+			[
+				"Dom Pedro II",
+				"Dom Pedro I",
+				"Getúlio Vargas"
+			]
+		],
+		[
+			"Qual povo construiu o Coliseu?",
+			"Romanos",
+			[
+				"Gregos",
+				"Vikings",
+				"Francos"
+			]
+		],
+		[
+			"Em que ano caiu o Muro de Berlim?",
+			"1989",
+			[
+				"1961",
+				"1975",
+				"1991"
+			]
+		],
+		[
+			"Quem liderou a independência do Haiti?",
+			"Toussaint Louverture",
+			[
+				"Simón Bolívar",
+				"José Bonifácio",
+				"Pedro I"
+			]
+		],
+		[
+			"Qual foi o primeiro presidente do Brasil?",
+			"Deodoro da Fonseca",
+			[
+				"Floriano Peixoto",
+				"Prudente de Morais",
+				"Campos Sales"
+			]
+		],
+		[
+			"Em que ano começou a Primeira Guerra Mundial?",
+			"1914",
+			[
+				"1898",
+				"1904",
+				"1918"
+			]
+		],
+		[
+			"Qual civilização construiu os zigurates?",
+			"Mesopotâmica",
+			[
+				"Egípcia",
+				"Inca",
+				"Romana"
+			]
+		],
+		[
+			"Quem foi o líder da Revolução Cubana?",
+			"Fidel Castro",
+			[
+				"Che Guevara",
+				"Raúl Castro",
+				"Fulgencio Batista"
+			]
+		],
+		[
+			"Qual foi o período em que o Brasil foi governado por uma monarquia?",
+			"Império",
+			[
+				"Colônia",
+				"República Velha",
+				"Ditadura"
+			]
+		],
+		[
+			"Quem foi o autor da Declaração de Independência dos Estados Unidos?",
+			"Thomas Jefferson",
+			[
+				"Benjamin Franklin",
+				"John Adams",
+				"George Washington"
+			]
+		],
+		[
+			"Quem comandou o exército aliado que derrotou Napoleão em Waterloo?",
+			"Duque de Wellington",
+			[
+				"Napoleão Bonaparte",
+				"Júlio César",
+				"Nelson"
+			]
+		],
+		[
+			"Qual civilização antiga construiu as pirâmides de Gizé?",
+			"Egípcia",
+			[
+				"Romana",
+				"Grega",
+				"Persa"
+			]
+		],
+		[
+			"Em que ano foi proclamada a Independência dos Estados Unidos?",
+			"1776",
+			[
+				"1789",
+				"1804",
+				"1750"
+			]
+		]
+	]
+}
