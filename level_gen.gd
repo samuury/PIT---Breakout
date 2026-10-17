@@ -3,8 +3,9 @@ extends RefCounted
 
 const COLS := 14
 const ROWS := 8
-# Fração dos obstáculos sorteados que realmente aparecem (menor = menos blocos inquebráveis).
+# Frações dos perigos sorteados que aparecem; os demais viram blocos normais.
 const OBSTACLE_KEEP := 0.45
+const BOMB_KEEP := 0.15
 
 
 static func generate(level: int, modo: String, dif: Dictionary) -> Array:
@@ -49,10 +50,13 @@ static func generate(level: int, modo: String, dif: Dictionary) -> Array:
 					var wo: int = dif.haz_obs
 					var wb: int = dif.haz_bomba
 					var tipo := "obstaculo" if randi() % (wo + wb) < wo else "bomba"
-					if tipo == "obstaculo" and randf() > OBSTACLE_KEEP:
+					var keep_chance: float = OBSTACLE_KEEP if tipo == "obstaculo" else BOMB_KEEP
+					if randf() <= keep_chance:
+						cells.append({"r": r, "c": c, "tipo": tipo, "hp": 1})
 						continue
-					cells.append({"r": r, "c": c, "tipo": tipo, "hp": 1})
-				continue
+					on = true
+				else:
+					continue
 			var hp := 1
 			if level >= 2 and r < 2:
 				hp = 2

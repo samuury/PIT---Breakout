@@ -19,10 +19,27 @@ func load_json(path: String) -> bool:
 		push_warning("Banco de perguntas não encontrado: " + path)
 		return false
 	var data = JSON.parse_string(FileAccess.get_file_as_string(path))
-	if typeof(data) != TYPE_DICTIONARY:
+	if not validate_data(data):
 		push_warning("JSON de perguntas inválido: " + path)
 		return false
 	gerais = data
+	return true
+
+
+func validate_data(data: Variant) -> bool:
+	if typeof(data) != TYPE_DICTIONARY:
+		return false
+	for category in data:
+		if typeof(category) != TYPE_STRING or typeof(data[category]) != TYPE_ARRAY or data[category].is_empty():
+			return false
+		for question in data[category]:
+			if typeof(question) != TYPE_ARRAY or question.size() != 3 \
+					or typeof(question[0]) != TYPE_STRING or typeof(question[1]) != TYPE_STRING \
+					or typeof(question[2]) != TYPE_ARRAY or question[2].size() < 3:
+				return false
+			for option in question[2]:
+				if typeof(option) != TYPE_STRING:
+					return false
 	return true
 
 

@@ -24,10 +24,13 @@ const MAX_BALLS := 6
 const STALL_LIMIT := 8.0
 const MAX_DROPS := 3
 const SPEED_K := 1.875  # +25% sobre o valor anterior (1.5), vale para todas as dificuldades
-const SAVE_PATH := "user://recorde_breakout_matematico.txt"
+const SIM_STEP := 1.0 / 60.0
+const MAX_CATCH_UP := 0.25
+var save_path := "user://recorde_breakout_matematico.txt"
 const QUESTIONS_PATH := "res://data/perguntas.json"
 const QuizBankScript := preload("res://quiz_bank.gd")
 const LevelGenScript := preload("res://level_gen.gd")
+const RecordStoreScript := preload("res://record_store.gd")
 const ROW_PTS := [7, 7, 5, 5, 3, 3, 1, 1]
 const MATERIAS := ["Matemática", "Geografia", "Ciências", "História", "Cultura"]
 var ROW_COLORS: Array[Color] = [
@@ -91,8 +94,10 @@ var paddle_w := PADDLE_BASE_W
 var use_mouse := false
 var mouse_ratio := 0.5
 var t_anim := 0.0
+var sim_accumulator := 0.0
 var novo_recorde := false
 var bank
+var record_store
 var drop_cd := 0.0
 var stall_t := 0.0
 var shake := 0.0
@@ -114,6 +119,8 @@ var quiz_answered := false
 var quiz_fb := 0.0
 
 var hud_label: Label
+var hud_status_label: Label
+var hud_effects_label: Label
 var msg_label: Label
 var hint_label: Label
 var quiz_box: CenterContainer
@@ -133,7 +140,8 @@ func _ready() -> void:
 	var win := get_window()
 	win.content_scale_mode = Window.CONTENT_SCALE_MODE_CANVAS_ITEMS
 	win.content_scale_aspect = Window.CONTENT_SCALE_ASPECT_KEEP
-	win.content_scale_size = Vector2i(1280, 720)
+	win.content_scale_size = Vector2i(1920, 1080)
+	record_store = RecordStoreScript.new(save_path)
 	hi = load_hi()
 	bank = QuizBankScript.new()
 	bank.load_json(QUESTIONS_PATH)
@@ -387,8 +395,8 @@ func add_brick(tipo: String, pos: Vector2, r: int, hp: int) -> void:
 		col = Color8(105, 112, 128)
 		node = box(Vector3(BR_W, BR_H, 1.0), col, Vector3(pos.x, pos.y, 0), 0.1)
 	elif tipo == "bomba":
-		col = Color8(155, 45, 42)
-		node = box(Vector3(BR_W, BR_H, 0.8), col, Vector3(pos.x, pos.y, 0), 0.5)
+		col = Color8(55, 43, 62)
+		node = box(Vector3(BR_W, BR_H, 0.8), col, Vector3(pos.x, pos.y, 0), 0.7)
 		var sm := SphereMesh.new()
 		sm.radius = 0.25
 		sm.height = 0.5
@@ -480,16 +488,11 @@ func finish_game() -> void:
 
 
 func load_hi() -> int:
-	if FileAccess.file_exists(SAVE_PATH):
-		var f := FileAccess.open(SAVE_PATH, FileAccess.READ)
-		return int(f.get_as_text().strip_edges())
-	return 0
+	return record_store.load_score()
 
 
 func save_hi() -> void:
-	var f := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
-	if f:
-		f.store_string(str(hi))
+	record_store.save_score(hi)
 
 
 # ---------------------------------------------------------------- acertos / bombas
@@ -825,6 +828,7 @@ func open_quiz(tipo: String) -> void:
 	for i in 4:
 		quiz_buttons[i].text = "%d)  %s" % [i + 1, quiz.opts[i]]
 		quiz_buttons[i].modulate = Color.WHITE
+	quiz_buttons[0].grab_focus()
 	quiz_fb_label.text = "Teclas 1-4 ou clique  •  Resposta rápida = mais pontos"
 	quiz_fb_label.modulate = Color(0.7, 0.7, 0.8)
 	set_state("QUIZ")
@@ -923,11 +927,18 @@ func set_state(s: String) -> void:
 
 
 func _process(delta: float) -> void:
-	delta = minf(delta, 1.0 / 30.0)
-	t_anim += delta
-	update_shake(delta)
-	update_fx(delta)
+	var visual_delta := minf(delta, 0.1)
+	t_anim += visual_delta
+	update_shake(visual_delta)
+	update_fx(visual_delta)
+	sim_accumulator = minf(sim_accumulator + maxf(delta, 0.0), MAX_CATCH_UP)
+	while sim_accumulator >= SIM_STEP:
+		process_game_step(SIM_STEP)
+		sim_accumulator -= SIM_STEP
 	update_hud()
+
+
+func process_game_step(delta: float) -> void:
 	match state:
 		"QUIZ":
 			if not quiz_answered:
@@ -1048,12 +1059,15 @@ func update_game(delta: float) -> void:
 func update_hud() -> void:
 	var show_hud := state in ["JOGANDO", "QUIZ", "PAUSA", "NIVEL"]
 	hud_label.visible = show_hud
-	var boosts := ""
+	hud_status_label.visible = show_hud
+	hud_effects_label.visible = show_hud
+	var boost_items: Array[String] = []
 	for k in active:
 		var info: Dictionary = BOOSTS[k] if BOOSTS.has(k) else DOWNGRADES[k]
-		boosts += "   [%s %ds]" % [info.nome, int(ceil(float(active[k])))]
-	hud_label.text = "PONTOS %06d   RECORDE %06d   NÍVEL %d\nVIDAS %d   QUIZ %d/%d%s" % [
-		score, maxi(hi, score), level, lives, int(stats.get("acertos", 0)), int(stats.get("total", 0)), boosts]
+		boost_items.append("%s %ds" % [info.nome, int(ceil(float(active[k])))])
+	hud_label.text = "PONTOS %06d    RECORDE %06d    NÍVEL %d" % [score, maxi(hi, score), level]
+	hud_status_label.text = "VIDAS %d    QUIZ %d/%d" % [lives, int(stats.get("acertos", 0)), int(stats.get("total", 0))]
+	hud_effects_label.text = "  •  ".join(boost_items)
 
 	var hint := ""
 	if state == "JOGANDO":
@@ -1123,7 +1137,25 @@ func build_ui() -> void:
 
 	hud_label = make_label(22)
 	hud_label.position = Vector2(20, 12)
+	hud_label.add_theme_color_override("font_color", Color8(255, 220, 135))
 	cl.add_child(hud_label)
+
+	hud_status_label = make_label(18)
+	hud_status_label.position = Vector2(20, 46)
+	hud_status_label.add_theme_color_override("font_color", Color8(155, 220, 235))
+	cl.add_child(hud_status_label)
+
+	hud_effects_label = make_label(17)
+	hud_effects_label.set_anchors_and_offsets_preset(Control.PRESET_TOP_RIGHT)
+	hud_effects_label.offset_left = -760
+	hud_effects_label.offset_right = -24
+	hud_effects_label.offset_top = 18
+	hud_effects_label.offset_bottom = 72
+	hud_effects_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	hud_effects_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	hud_effects_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	hud_effects_label.add_theme_color_override("font_color", Color8(185, 225, 190))
+	cl.add_child(hud_effects_label)
 
 	msg_label = make_label(30)
 	msg_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -1184,8 +1216,9 @@ func build_ui() -> void:
 	for i in 4:
 		var b := Button.new()
 		b.custom_minimum_size = Vector2(360, 60)
-		b.focus_mode = Control.FOCUS_NONE
+		b.focus_mode = Control.FOCUS_ALL
 		b.add_theme_font_size_override("font_size", 22)
+		style_button(b)
 		b.pressed.connect(answer.bind(i))
 		grid.add_child(b)
 		quiz_buttons.append(b)
@@ -1227,9 +1260,26 @@ func mbutton(text: String, cb: Callable, w := 380.0) -> Button:
 	b.custom_minimum_size = Vector2(w, 46)
 	b.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	b.add_theme_font_size_override("font_size", 21)
+	style_button(b)
 	b.pressed.connect(cb)
 	menu_vb.add_child(b)
 	return b
+
+
+func button_style(background: Color, border: Color) -> StyleBoxFlat:
+	var style := StyleBoxFlat.new()
+	style.bg_color = background
+	style.border_color = border
+	style.set_border_width_all(1)
+	style.set_corner_radius_all(6)
+	return style
+
+
+func style_button(button: Button) -> void:
+	button.add_theme_stylebox_override("normal", button_style(Color8(31, 39, 57), Color8(68, 91, 122)))
+	button.add_theme_stylebox_override("hover", button_style(Color8(44, 60, 78), Color8(100, 190, 220)))
+	button.add_theme_stylebox_override("pressed", button_style(Color8(24, 34, 48), Color8(255, 205, 110)))
+	button.add_theme_stylebox_override("focus", button_style(Color(0, 0, 0, 0), Color8(255, 220, 135)))
 
 
 func materias_text() -> String:
@@ -1476,7 +1526,7 @@ func _notification(what: int) -> void:
 func panel_style() -> StyleBoxFlat:
 	var sb := StyleBoxFlat.new()
 	sb.bg_color = Color8(22, 22, 44, 250)
-	sb.border_color = Color8(100, 140, 210)
-	sb.set_border_width_all(2)
-	sb.set_corner_radius_all(14)
+	sb.border_color = Color8(75, 130, 160)
+	sb.set_border_width_all(1)
+	sb.set_corner_radius_all(8)
 	return sb

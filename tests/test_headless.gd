@@ -7,6 +7,7 @@ func _init() -> void:
 	run()
 func run() -> void:
 	var m = load("res://Main.gd").new()
+	m.save_path = "user://test_recorde_%d.txt" % OS.get_process_id()
 	root.add_child(m)
 	await process_frame
 	await process_frame
@@ -14,6 +15,8 @@ func run() -> void:
 	print("== banco de perguntas")
 	var g: Dictionary = m.bank.gerais
 	check(g.size() == 4 and g["Geografia"].size() >= 24, "JSON carregado: 4 matérias gerais")
+	check(m.bank.validate_data({"Geografia": [["Pergunta?", "Resposta", ["A", "B", "C"]]]}), "schema de pergunta válido aceito")
+	check(not m.bank.validate_data({"Geografia": [["Pergunta?", "Resposta", []]]}), "schema sem alternativas rejeitado")
 	m.materias_sel = todas
 	var ruins := 0
 	for lv in [1, 3, 6, 10]:
@@ -38,16 +41,25 @@ func run() -> void:
 	print("== geração de fases")
 	var LG = load("res://level_gen.gd")
 	var sem := 0
+	var vazios_random := 0
+	var bombas_random := 0
+	var celulas_random := 0
 	for modo in ["padrao","random"]:
 		for dif in ["facil","normal","dificil"]:
 			for lv in range(1, 16):
 				for k in 20:
 					var cells = LG.generate(lv, modo, m.DIFS[dif])
+					if modo == "random":
+						if cells.size() != LG.COLS * LG.ROWS: vazios_random += 1
+						celulas_random += cells.size()
 					var n := 0
 					for c in cells:
 						if c.tipo == "normal": n += 1
+						if modo == "random" and c.tipo == "bomba": bombas_random += 1
 					if n == 0: sem += 1
 	check(sem == 0, "1800 fases geradas, todas com bloco normal")
+	check(vazios_random == 0, "fases Random sem espaços vazios: %d" % vazios_random)
+	check(float(bombas_random) / celulas_random < 0.08, "bombas Random abaixo de 8%% das células (%d/%d)" % [bombas_random, celulas_random])
 	print("== multibola limitada")
 	m.modo_jogo = "padrao"; m.dificuldade = "normal"
 	m.start_game(); m.launch()
@@ -85,13 +97,13 @@ func run() -> void:
 	m.start_game(); m.score = 987654
 	m._notification(Node.NOTIFICATION_WM_CLOSE_REQUEST)
 	check(m.load_hi() >= 987654, "recorde gravado no fechamento: %d" % m.load_hi())
-	DirAccess.remove_absolute(ProjectSettings.globalize_path(m.SAVE_PATH))
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(m.save_path))
 	print("== partida completa + game over")
 	m.modo_jogo = "random"; m.dificuldade = "dificil"; m.materias_sel = todas
 	m.start_game(); m.launch()
 	for i in 3: m.lose_life()
 	check(m.state == "FIM", "game over alcançado")
 	m.hi = 0
-	DirAccess.remove_absolute(ProjectSettings.globalize_path(m.SAVE_PATH))
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(m.save_path))
 	print("RESULTADO: ", "TUDO OK" if falhas == 0 else "%d FALHA(S)" % falhas)
 	quit(0 if falhas == 0 else 1)

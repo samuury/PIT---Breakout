@@ -41,7 +41,8 @@ persistência do recorde.
 
 ### Arquivos principais
 
-- `Main.gd`: fluxo do jogo, física, interface, boosts e recorde.
+- `Main.gd`: fluxo do jogo, física, interface e boosts.
+- `record_store.gd`: leitura e gravação do recorde.
 - `quiz_bank.gd`: perguntas matemáticas, banco geral e fila de revisão.
 - `level_gen.gd`: geração procedural das fases.
 - `data/perguntas.json`: perguntas de conhecimentos gerais.
