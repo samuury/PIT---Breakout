@@ -12,6 +12,11 @@ const MATH_GENS := [
 var gerais: Dictionary = {}
 var revisit: Array = []
 var level := 1
+var adapt: Dictionary = {}  # categoria -> ajuste de nível (-2..+2), definido por quem usa o banco
+
+
+func eff_level(cat: String) -> int:
+	return maxi(1, level + int(adapt.get(cat, 0)))
 
 
 func load_json(path: String) -> bool:
@@ -19,27 +24,10 @@ func load_json(path: String) -> bool:
 		push_warning("Banco de perguntas não encontrado: " + path)
 		return false
 	var data = JSON.parse_string(FileAccess.get_file_as_string(path))
-	if not validate_data(data):
+	if typeof(data) != TYPE_DICTIONARY:
 		push_warning("JSON de perguntas inválido: " + path)
 		return false
 	gerais = data
-	return true
-
-
-func validate_data(data: Variant) -> bool:
-	if typeof(data) != TYPE_DICTIONARY:
-		return false
-	for category in data:
-		if typeof(category) != TYPE_STRING or typeof(data[category]) != TYPE_ARRAY or data[category].is_empty():
-			return false
-		for question in data[category]:
-			if typeof(question) != TYPE_ARRAY or question.size() != 3 \
-					or typeof(question[0]) != TYPE_STRING or typeof(question[1]) != TYPE_STRING \
-					or typeof(question[2]) != TYPE_ARRAY or question[2].size() < 3:
-				return false
-			for option in question[2]:
-				if typeof(option) != TYPE_STRING:
-					return false
 	return true
 
 
@@ -288,7 +276,7 @@ func q_problema(n: int) -> Dictionary:
 
 func gen_from(entry: Array) -> Dictionary:
 	if str(entry[1]) != "":
-		return call(str(entry[1]), level)
+		return call(str(entry[1]), eff_level(str(entry[0])))
 	var cat: String = entry[0]
 	var lista: Array = gerais.get(cat, [])
 	var e: Array = lista.pick_random()
@@ -319,7 +307,7 @@ func due_revisit() -> Dictionary:
 			var q: Dictionary
 			var gname := math_gen_for(r.cat)
 			if gname != "":
-				q = call(gname, level)
+				q = call(gname, eff_level(str(r.cat)))
 			else:
 				q = (r.q as Dictionary).duplicate(true)
 				var ans: String = q.ans

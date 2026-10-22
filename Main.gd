@@ -24,13 +24,11 @@ const MAX_BALLS := 6
 const STALL_LIMIT := 8.0
 const MAX_DROPS := 3
 const SPEED_K := 1.875  # +25% sobre o valor anterior (1.5), vale para todas as dificuldades
-const SIM_STEP := 1.0 / 60.0
-const MAX_CATCH_UP := 0.25
-var save_path := "user://recorde_breakout_matematico.txt"
+const SAVE_PATH := "user://recorde_breakout_matematico.txt"
 const QUESTIONS_PATH := "res://data/perguntas.json"
+const CONFIG_PATH := "user://config_breakout.cfg"
 const QuizBankScript := preload("res://quiz_bank.gd")
 const LevelGenScript := preload("res://level_gen.gd")
-const RecordStoreScript := preload("res://record_store.gd")
 const ROW_PTS := [7, 7, 5, 5, 3, 3, 1, 1]
 const MATERIAS := ["Matemática", "Geografia", "Ciências", "História", "Cultura"]
 var ROW_COLORS: Array[Color] = [
@@ -94,10 +92,12 @@ var paddle_w := PADDLE_BASE_W
 var use_mouse := false
 var mouse_ratio := 0.5
 var t_anim := 0.0
-var sim_accumulator := 0.0
 var novo_recorde := false
+var save_path := SAVE_PATH
+var config_path := CONFIG_PATH
+var sound_on := true
+var bump_tw: Tween
 var bank
-var record_store
 var drop_cd := 0.0
 var stall_t := 0.0
 var shake := 0.0
@@ -119,8 +119,6 @@ var quiz_answered := false
 var quiz_fb := 0.0
 
 var hud_label: Label
-var hud_status_label: Label
-var hud_effects_label: Label
 var msg_label: Label
 var hint_label: Label
 var quiz_box: CenterContainer
@@ -140,12 +138,12 @@ func _ready() -> void:
 	var win := get_window()
 	win.content_scale_mode = Window.CONTENT_SCALE_MODE_CANVAS_ITEMS
 	win.content_scale_aspect = Window.CONTENT_SCALE_ASPECT_KEEP
-	win.content_scale_size = Vector2i(1920, 1080)
-	record_store = RecordStoreScript.new(save_path)
+	win.content_scale_size = Vector2i(1280, 720)
 	hi = load_hi()
 	bank = QuizBankScript.new()
 	bank.load_json(QUESTIONS_PATH)
 	setup_input()
+	load_config()
 	setup_sfx()
 	setup_env()
 	setup_world()
@@ -182,6 +180,7 @@ func make_seq(notes: Array, vol := 0.22) -> AudioStreamWAV:
 func sfx_add(nome: String, notes: Array, vol := 0.22) -> void:
 	var p := AudioStreamPlayer.new()
 	p.stream = make_seq(notes, vol)
+	p.max_polyphony = 4
 	add_child(p)
 	sfx_players[nome] = p
 
@@ -395,8 +394,8 @@ func add_brick(tipo: String, pos: Vector2, r: int, hp: int) -> void:
 		col = Color8(105, 112, 128)
 		node = box(Vector3(BR_W, BR_H, 1.0), col, Vector3(pos.x, pos.y, 0), 0.1)
 	elif tipo == "bomba":
-		col = Color8(55, 43, 62)
-		node = box(Vector3(BR_W, BR_H, 0.8), col, Vector3(pos.x, pos.y, 0), 0.7)
+		col = Color8(155, 45, 42)
+		node = box(Vector3(BR_W, BR_H, 0.8), col, Vector3(pos.x, pos.y, 0), 0.5)
 		var sm := SphereMesh.new()
 		sm.radius = 0.25
 		sm.height = 0.5
@@ -453,6 +452,7 @@ func load_level() -> void:
 
 
 func start_game() -> void:
+	save_config()
 	score = 0
 	lives = 3
 	level = 1
@@ -488,11 +488,24 @@ func finish_game() -> void:
 
 
 func load_hi() -> int:
-	return record_store.load_score()
+	if FileAccess.file_exists(save_path):
+		var f := FileAccess.open(save_path, FileAccess.READ)
+		if f == null:
+			push_warning("Não foi possível abrir o arquivo de recorde: %s" % save_path)
+			return 0
+		var value := f.get_as_text().strip_edges()
+		if value.is_valid_int():
+			return maxi(0, value.to_int())
+		push_warning("Arquivo de recorde inválido; usando 0: %s" % save_path)
+	return 0
 
 
 func save_hi() -> void:
-	record_store.save_score(hi)
+	var f := FileAccess.open(save_path, FileAccess.WRITE)
+	if f == null:
+		push_warning("Não foi possível salvar o recorde: %s" % save_path)
+		return
+	f.store_string(str(hi))
 
 
 # ---------------------------------------------------------------- acertos / bombas
@@ -510,6 +523,7 @@ func hit_brick(br: Dictionary, destroy := false) -> void:
 	if int(br.hp) > 0:
 		sfx_play("duro")
 		tint(br)
+		flash_brick(node)
 		burst(node.position, Color(0.9, 0.9, 0.95), 4)
 		return
 	bricks.erase(br)
@@ -518,7 +532,7 @@ func hit_brick(br: Dictionary, destroy := false) -> void:
 	score += int(br.pts) * level * (2 if active.has("X2") else 1)
 	sfx_play("bloco")
 	burst(node.position, col, 12)
-	node.queue_free()
+	pop_brick(node)
 	shake = maxf(shake, 0.08)
 	if drop_cd <= 0.0 and randf() < DROP_CHANCE and drops.size() < MAX_DROPS:
 		drop_cd = DROP_COOLDOWN
@@ -704,6 +718,7 @@ func step_ball(b: Dictionary, dt: float) -> bool:
 			pos.y = PADDLE_Y + PADDLE_H * 0.5 + BALL_R
 			accel = minf(1.3, accel + 0.01)
 			sfx_play("raquete")
+			paddle_bump()
 			if active.has("IMA"):
 				b.stuck = true
 				b.off = pos.x - paddle.position.x
@@ -737,13 +752,17 @@ func update_lasers(delta: float) -> void:
 		l.pos = p
 		var n: MeshInstance3D = l.node
 		n.position = Vector3(p.x, p.y, 0)
-		var target = null
+		var target: Dictionary = {}
+		var target_distance := INF
 		for br in bricks:
 			var bp: Vector2 = br.pos
-			if absf(p.x - bp.x) < BR_W * 0.5 + 0.045 and absf(p.y - bp.y) < BR_H * 0.5 + 0.15:
+			var vertical_distance := absf(p.y - bp.y)
+			if absf(p.x - bp.x) < BR_W * 0.5 + 0.045 \
+					and vertical_distance < BR_H * 0.5 + 0.15 \
+					and vertical_distance < target_distance:
 				target = br
-				break
-		if target != null:
+				target_distance = vertical_distance
+		if not target.is_empty():
 			hit_brick(target)
 			n.queue_free()
 			lasers.erase(l)
@@ -755,7 +774,7 @@ func update_lasers(delta: float) -> void:
 func update_paddle(delta: float) -> void:
 	var dir := 0.0
 	dir = Input.get_axis("esq", "dir")
-	var spd := 18.0 * (0.55 if active.has("RAQUETE_LENTA") else 1.0)
+	var spd := 22.0 * (0.55 if active.has("RAQUETE_LENTA") else 1.0)
 	var x := paddle.position.x
 	if dir != 0.0:
 		use_mouse = false
@@ -804,7 +823,20 @@ func update_drops(delta: float) -> void:
 
 
 # ---------------------------------------------------------------- perguntas
+func adapt_offsets() -> Dictionary:
+	# Dificuldade adaptativa: acerto alto sobe o nível daquela matéria, acerto baixo desce.
+	var out := {}
+	var pc: Dictionary = stats.por_cat
+	for cat in pc:
+		var ok: int = pc[cat][0]
+		var tot: int = pc[cat][1]
+		if tot >= 3:
+			out[cat] = clampi(int(round((float(ok) / tot - 0.6) * 5.0)), -2, 2)
+	return out
+
+
 func pick_question() -> Dictionary:
+	bank.adapt = adapt_offsets()
 	return bank.pick(materias_sel, ultima_cat, used, level)
 
 
@@ -828,7 +860,6 @@ func open_quiz(tipo: String) -> void:
 	for i in 4:
 		quiz_buttons[i].text = "%d)  %s" % [i + 1, quiz.opts[i]]
 		quiz_buttons[i].modulate = Color.WHITE
-	quiz_buttons[0].grab_focus()
 	quiz_fb_label.text = "Teclas 1-4 ou clique  •  Resposta rápida = mais pontos"
 	quiz_fb_label.modulate = Color(0.7, 0.7, 0.8)
 	set_state("QUIZ")
@@ -927,18 +958,11 @@ func set_state(s: String) -> void:
 
 
 func _process(delta: float) -> void:
-	var visual_delta := minf(delta, 0.1)
-	t_anim += visual_delta
-	update_shake(visual_delta)
-	update_fx(visual_delta)
-	sim_accumulator = minf(sim_accumulator + maxf(delta, 0.0), MAX_CATCH_UP)
-	while sim_accumulator >= SIM_STEP:
-		process_game_step(SIM_STEP)
-		sim_accumulator -= SIM_STEP
+	delta = minf(delta, 1.0 / 30.0)
+	t_anim += delta
+	update_shake(delta)
+	update_fx(delta)
 	update_hud()
-
-
-func process_game_step(delta: float) -> void:
 	match state:
 		"QUIZ":
 			if not quiz_answered:
@@ -1059,15 +1083,12 @@ func update_game(delta: float) -> void:
 func update_hud() -> void:
 	var show_hud := state in ["JOGANDO", "QUIZ", "PAUSA", "NIVEL"]
 	hud_label.visible = show_hud
-	hud_status_label.visible = show_hud
-	hud_effects_label.visible = show_hud
-	var boost_items: Array[String] = []
+	var boosts := ""
 	for k in active:
 		var info: Dictionary = BOOSTS[k] if BOOSTS.has(k) else DOWNGRADES[k]
-		boost_items.append("%s %ds" % [info.nome, int(ceil(float(active[k])))])
-	hud_label.text = "PONTOS %06d    RECORDE %06d    NÍVEL %d" % [score, maxi(hi, score), level]
-	hud_status_label.text = "VIDAS %d    QUIZ %d/%d" % [lives, int(stats.get("acertos", 0)), int(stats.get("total", 0))]
-	hud_effects_label.text = "  •  ".join(boost_items)
+		boosts += "   [%s %ds]" % [info.nome, int(ceil(float(active[k])))]
+	hud_label.text = "PONTOS %06d   RECORDE %06d   NÍVEL %d\nVIDAS %d   QUIZ %d/%d%s" % [
+		score, maxi(hi, score), level, lives, int(stats.get("acertos", 0)), int(stats.get("total", 0)), boosts]
 
 	var hint := ""
 	if state == "JOGANDO":
@@ -1105,13 +1126,16 @@ func fim_text() -> String:
 	var pc: Dictionary = stats.por_cat
 	if pc.is_empty():
 		s += "Nenhuma cápsula coletada nesta partida.\n"
+	var ad := adapt_offsets()
 	var names := pc.keys()
 	names.sort_custom(func(a, b): return int(pc[a][1]) > int(pc[b][1]))
 	for nm in names:
 		var ac: int = pc[nm][0]
 		var tt: int = pc[nm][1]
 		var filled := int(round(10.0 * ac / tt)) if tt > 0 else 0
-		s += "%s  [%s%s]  %d/%d\n" % [nm, "#".repeat(filled), "-".repeat(10 - filled), ac, tt]
+		var adj := int(ad.get(nm, 0))
+		var adj_txt := ("   (nível %+d)" % adj) if adj != 0 else ""
+		s += "%s  [%s%s]  %d/%d%s\n" % [nm, "#".repeat(filled), "-".repeat(10 - filled), ac, tt, adj_txt]
 	s += "\nENTER: jogar de novo   •   M: menu   •   ESC: sair"
 	return s
 
@@ -1137,25 +1161,7 @@ func build_ui() -> void:
 
 	hud_label = make_label(22)
 	hud_label.position = Vector2(20, 12)
-	hud_label.add_theme_color_override("font_color", Color8(255, 220, 135))
 	cl.add_child(hud_label)
-
-	hud_status_label = make_label(18)
-	hud_status_label.position = Vector2(20, 46)
-	hud_status_label.add_theme_color_override("font_color", Color8(155, 220, 235))
-	cl.add_child(hud_status_label)
-
-	hud_effects_label = make_label(17)
-	hud_effects_label.set_anchors_and_offsets_preset(Control.PRESET_TOP_RIGHT)
-	hud_effects_label.offset_left = -760
-	hud_effects_label.offset_right = -24
-	hud_effects_label.offset_top = 18
-	hud_effects_label.offset_bottom = 72
-	hud_effects_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-	hud_effects_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	hud_effects_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	hud_effects_label.add_theme_color_override("font_color", Color8(185, 225, 190))
-	cl.add_child(hud_effects_label)
 
 	msg_label = make_label(30)
 	msg_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -1216,9 +1222,8 @@ func build_ui() -> void:
 	for i in 4:
 		var b := Button.new()
 		b.custom_minimum_size = Vector2(360, 60)
-		b.focus_mode = Control.FOCUS_ALL
+		b.focus_mode = Control.FOCUS_NONE
 		b.add_theme_font_size_override("font_size", 22)
-		style_button(b)
 		b.pressed.connect(answer.bind(i))
 		grid.add_child(b)
 		quiz_buttons.append(b)
@@ -1260,26 +1265,9 @@ func mbutton(text: String, cb: Callable, w := 380.0) -> Button:
 	b.custom_minimum_size = Vector2(w, 46)
 	b.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	b.add_theme_font_size_override("font_size", 21)
-	style_button(b)
 	b.pressed.connect(cb)
 	menu_vb.add_child(b)
 	return b
-
-
-func button_style(background: Color, border: Color) -> StyleBoxFlat:
-	var style := StyleBoxFlat.new()
-	style.bg_color = background
-	style.border_color = border
-	style.set_border_width_all(1)
-	style.set_corner_radius_all(6)
-	return style
-
-
-func style_button(button: Button) -> void:
-	button.add_theme_stylebox_override("normal", button_style(Color8(31, 39, 57), Color8(68, 91, 122)))
-	button.add_theme_stylebox_override("hover", button_style(Color8(44, 60, 78), Color8(100, 190, 220)))
-	button.add_theme_stylebox_override("pressed", button_style(Color8(24, 34, 48), Color8(255, 205, 110)))
-	button.add_theme_stylebox_override("focus", button_style(Color(0, 0, 0, 0), Color8(255, 220, 135)))
 
 
 func materias_text() -> String:
@@ -1310,7 +1298,8 @@ func rebuild_menu() -> void:
 			mlabel("", 8)
 			var jb := mbutton("JOGAR", func(): set_state("SELECAO_MODO"), 280.0)
 			mbutton("COMO JOGAR", func(): set_state("AJUDA"), 280.0)
-			mlabel("← → / A D / mouse: mover  •  ESPAÇO: lançar / laser  •  P: pausa", 15, grey)
+			mbutton("SOM: " + ("LIGADO" if sound_on else "DESLIGADO"), toggle_sound, 280.0)
+			mlabel("← → / A D / mouse: mover  •  ESPAÇO: lançar / laser  •  P: pausa  •  F11: tela cheia", 15, grey)
 			jb.grab_focus()
 		"AJUDA":
 			mlabel("COMO JOGAR", 36, gold)
@@ -1332,7 +1321,7 @@ func rebuild_menu() -> void:
 			mlabel("Conhecimentos gerais: Geografia • Ciências • História • Cultura", 15)
 			mlabel("Errou ou o tempo acabou? Downgrade por 8 s, e a matéria volta depois como REVISÃO.", 15, Color8(240, 90, 90))
 			mlabel("Blocos cinza = obstáculos indestrutíveis  •  Blocos vermelhos = bombas (explosão em cadeia)", 15, grey)
-			mlabel("Mover: ← → / A D / mouse / direcional  •  Lançar e atirar: ESPAÇO / botão A  •  Responder: 1-4  •  Pausa: P", 15, grey)
+			mlabel("Mover: ← → / A D / mouse / direcional  •  Lançar e atirar: ESPAÇO / botão A  •  Responder: 1-4 ou A/B/X/Y  •  Pausa: P ou Start", 15, grey)
 			mbutton("VOLTAR", func(): set_state("MENU"), 240.0).grab_focus()
 		"SELECAO_MODO":
 			mlabel("ESCOLHA O MODO DE JOGO", 30)
@@ -1417,6 +1406,13 @@ func on_primary() -> void:
 
 
 func _input(event: InputEvent) -> void:
+	if event is InputEventKey and (event as InputEventKey).pressed and not (event as InputEventKey).echo \
+			and (event as InputEventKey).keycode == KEY_F11:
+		toggle_fullscreen()
+		return
+	if event is InputEventJoypadButton and (event as InputEventJoypadButton).pressed:
+		handle_pad((event as InputEventJoypadButton).button_index)
+		return
 	if state == "JOGANDO" and event.is_action_pressed("lancar"):
 		on_primary()
 		return
@@ -1518,6 +1514,8 @@ func update_shake(delta: float) -> void:
 
 
 func _notification(what: int) -> void:
+	if what == NOTIFICATION_APPLICATION_FOCUS_OUT and state == "JOGANDO":
+		set_state("PAUSA")
 	if what == NOTIFICATION_WM_CLOSE_REQUEST:
 		hi = maxi(hi, score)
 		save_hi()
@@ -1526,7 +1524,99 @@ func _notification(what: int) -> void:
 func panel_style() -> StyleBoxFlat:
 	var sb := StyleBoxFlat.new()
 	sb.bg_color = Color8(22, 22, 44, 250)
-	sb.border_color = Color8(75, 130, 160)
-	sb.set_border_width_all(1)
-	sb.set_corner_radius_all(8)
+	sb.border_color = Color8(100, 140, 210)
+	sb.set_border_width_all(2)
+	sb.set_corner_radius_all(14)
 	return sb
+
+
+func toggle_fullscreen() -> void:
+	var win := get_window()
+	win.mode = Window.MODE_WINDOWED if win.mode == Window.MODE_FULLSCREEN else Window.MODE_FULLSCREEN
+
+
+# ---------------------------------------------------------------- polimento / config
+func flash_brick(node: MeshInstance3D) -> void:
+	var m: StandardMaterial3D = node.material_override
+	m.emission_enabled = true
+	m.emission_energy_multiplier = 2.5
+	node.create_tween().tween_property(m, "emission_energy_multiplier", 0.15, 0.2)
+
+
+func pop_brick(node: MeshInstance3D) -> void:
+	var tw := node.create_tween()
+	tw.tween_property(node, "scale", Vector3.ZERO, 0.15).set_ease(Tween.EASE_IN)
+	tw.tween_callback(node.queue_free)
+
+
+func paddle_bump() -> void:
+	if bump_tw != null and bump_tw.is_valid():
+		bump_tw.kill()
+	paddle.scale.y = 1.7
+	bump_tw = paddle.create_tween()
+	bump_tw.tween_property(paddle, "scale:y", 1.0, 0.12)
+
+
+func handle_pad(btn: int) -> void:
+	match state:
+		"QUIZ":
+			if not quiz_answered:
+				if btn >= 0 and btn <= 3:
+					answer(btn)
+			elif quiz_fb < 2.0 and btn == 0:
+				close_quiz()
+		"JOGANDO":
+			if btn == JOY_BUTTON_START:
+				set_state("PAUSA")
+		"PAUSA":
+			if btn == JOY_BUTTON_START:
+				set_state("JOGANDO")
+		"FIM":
+			if btn == 0:
+				start_game()
+			elif btn == 1:
+				set_state("MENU")
+
+
+func apply_sound() -> void:
+	AudioServer.set_bus_mute(AudioServer.get_bus_index("Master"), not sound_on)
+
+
+func toggle_sound() -> void:
+	sound_on = not sound_on
+	apply_sound()
+	save_config()
+	call_deferred("rebuild_menu")
+
+
+func load_config() -> void:
+	var cf := ConfigFile.new()
+	if cf.load(config_path) != OK:
+		return
+	var md: String = str(cf.get_value("jogo", "modo", modo_jogo))
+	if md in ["padrao", "random"]:
+		modo_jogo = md
+	var df: String = str(cf.get_value("jogo", "dificuldade", dificuldade))
+	if DIFS.has(df):
+		dificuldade = df
+	var ms = cf.get_value("jogo", "materias", materias_sel)
+	if ms is Array:
+		var ok: Array = []
+		for m in MATERIAS:
+			if ms.has(m):
+				ok.append(m)
+		if not ok.is_empty():
+			materias_sel = ok
+	sound_on = bool(cf.get_value("jogo", "som", true))
+	apply_sound()
+
+
+func save_config() -> void:
+	var cf := ConfigFile.new()
+	cf.set_value("jogo", "modo", modo_jogo)
+	cf.set_value("jogo", "dificuldade", dificuldade)
+	cf.set_value("jogo", "materias", materias_sel)
+	cf.set_value("jogo", "som", sound_on)
+	var error := cf.save(config_path)
+	if error != OK:
+		push_warning("Não foi possível salvar as configurações (%s): %s" % [error, config_path])

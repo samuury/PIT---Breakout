@@ -3,9 +3,9 @@ extends RefCounted
 
 const COLS := 14
 const ROWS := 8
-# Frações dos perigos sorteados que aparecem; os demais viram blocos normais.
+# Fração dos obstáculos sorteados que permanecem (menor = menos blocos inquebráveis).
+# Os obstáculos removidos viram blocos normais na mesma posição.
 const OBSTACLE_KEEP := 0.45
-const BOMB_KEEP := 0.15
 
 
 static func generate(level: int, modo: String, dif: Dictionary) -> Array:
@@ -50,21 +50,13 @@ static func generate(level: int, modo: String, dif: Dictionary) -> Array:
 					var wo: int = dif.haz_obs
 					var wb: int = dif.haz_bomba
 					var tipo := "obstaculo" if randi() % (wo + wb) < wo else "bomba"
-					var keep_chance: float = OBSTACLE_KEEP if tipo == "obstaculo" else BOMB_KEEP
-					if randf() <= keep_chance:
-						cells.append({"r": r, "c": c, "tipo": tipo, "hp": 1})
+					if tipo == "obstaculo" and randf() > OBSTACLE_KEEP:
+						cells.append({"r": r, "c": c, "tipo": "normal", "hp": brick_hp(level, r, modo, dif)})
+						any_normal = true
 						continue
-					on = true
-				else:
-					continue
-			var hp := 1
-			if level >= 2 and r < 2:
-				hp = 2
-			if level >= 4:
-				hp = 3 if r < 2 else (2 if r < 4 else 1)
-			var bonus_hp := 1 if (modo == "random" and level >= 3 and r < 2) else 0
-			hp = mini(4, hp + int(dif.vida_extra) + bonus_hp)
-			cells.append({"r": r, "c": c, "tipo": "normal", "hp": hp})
+					cells.append({"r": r, "c": c, "tipo": tipo, "hp": 1})
+				continue
+			cells.append({"r": r, "c": c, "tipo": "normal", "hp": brick_hp(level, r, modo, dif)})
 			any_normal = true
 	if not any_normal:
 		for i in range(cells.size() - 1, -1, -1):
@@ -72,3 +64,13 @@ static func generate(level: int, modo: String, dif: Dictionary) -> Array:
 				cells.remove_at(i)
 		cells.append({"r": 0, "c": 6, "tipo": "normal", "hp": 1 + int(dif.vida_extra)})
 	return cells
+
+
+static func brick_hp(level: int, r: int, modo: String, dif: Dictionary) -> int:
+	var hp := 1
+	if level >= 2 and r < 2:
+		hp = 2
+	if level >= 4:
+		hp = 3 if r < 2 else (2 if r < 4 else 1)
+	var bonus_hp := 1 if (modo == "random" and level >= 3 and r < 2) else 0
+	return mini(4, hp + int(dif.vida_extra) + bonus_hp)

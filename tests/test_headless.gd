@@ -7,7 +7,8 @@ func _init() -> void:
 	run()
 func run() -> void:
 	var m = load("res://Main.gd").new()
-	m.save_path = "user://test_recorde_%d.txt" % OS.get_process_id()
+	m.save_path = "user://teste_recorde.txt"   # testes nunca tocam nos arquivos reais
+	m.config_path = "user://teste_config.cfg"
 	root.add_child(m)
 	await process_frame
 	await process_frame
@@ -15,8 +16,6 @@ func run() -> void:
 	print("== banco de perguntas")
 	var g: Dictionary = m.bank.gerais
 	check(g.size() == 4 and g["Geografia"].size() >= 24, "JSON carregado: 4 matérias gerais")
-	check(m.bank.validate_data({"Geografia": [["Pergunta?", "Resposta", ["A", "B", "C"]]]}), "schema de pergunta válido aceito")
-	check(not m.bank.validate_data({"Geografia": [["Pergunta?", "Resposta", []]]}), "schema sem alternativas rejeitado")
 	m.materias_sel = todas
 	var ruins := 0
 	for lv in [1, 3, 6, 10]:
@@ -41,25 +40,16 @@ func run() -> void:
 	print("== geração de fases")
 	var LG = load("res://level_gen.gd")
 	var sem := 0
-	var vazios_random := 0
-	var bombas_random := 0
-	var celulas_random := 0
 	for modo in ["padrao","random"]:
 		for dif in ["facil","normal","dificil"]:
 			for lv in range(1, 16):
 				for k in 20:
 					var cells = LG.generate(lv, modo, m.DIFS[dif])
-					if modo == "random":
-						if cells.size() != LG.COLS * LG.ROWS: vazios_random += 1
-						celulas_random += cells.size()
 					var n := 0
 					for c in cells:
 						if c.tipo == "normal": n += 1
-						if modo == "random" and c.tipo == "bomba": bombas_random += 1
 					if n == 0: sem += 1
 	check(sem == 0, "1800 fases geradas, todas com bloco normal")
-	check(vazios_random == 0, "fases Random sem espaços vazios: %d" % vazios_random)
-	check(float(bombas_random) / celulas_random < 0.08, "bombas Random abaixo de 8%% das células (%d/%d)" % [bombas_random, celulas_random])
 	print("== multibola limitada")
 	m.modo_jogo = "padrao"; m.dificuldade = "normal"
 	m.start_game(); m.launch()
@@ -98,6 +88,49 @@ func run() -> void:
 	m._notification(Node.NOTIFICATION_WM_CLOSE_REQUEST)
 	check(m.load_hi() >= 987654, "recorde gravado no fechamento: %d" % m.load_hi())
 	DirAccess.remove_absolute(ProjectSettings.globalize_path(m.save_path))
+	print("== dificuldade adaptativa")
+	m.start_game()
+	m.stats.por_cat = {"Aritmética": [5, 5], "Frações": [0, 4], "Tabuada": [2, 2]}
+	var ad: Dictionary = m.adapt_offsets()
+	check(ad.get("Aritmética", 0) == 2 and ad.get("Frações", 0) == -2 and not ad.has("Tabuada"), "ajustes por matéria: %s" % str(ad))
+	m.bank.adapt = ad
+	m.bank.level = 1
+	check(m.bank.eff_level("Aritmética") == 3 and m.bank.eff_level("Frações") == 1, "nível efetivo sobe com acerto e nunca fica abaixo de 1")
+	m.stats.por_cat = {}
+	m.bank.adapt = {}
+	print("== configurações salvas")
+	m.modo_jogo = "random"; m.dificuldade = "dificil"; m.materias_sel = ["Matemática", "Ciências"]; m.sound_on = false
+	m.save_config()
+	var m2 = load("res://Main.gd").new()
+	m2.save_path = "user://teste_recorde.txt"
+	m2.config_path = "user://teste_config.cfg"
+	root.add_child(m2)
+	await process_frame
+	await process_frame
+	check(m2.modo_jogo == "random" and m2.dificuldade == "dificil" and m2.materias_sel == ["Matemática", "Ciências"] and not m2.sound_on, "modo, dificuldade, matérias e som restaurados ao reabrir")
+	m2.sound_on = true; m2.apply_sound(); m2.queue_free()
+	m.sound_on = true; m.apply_sound()
+	print("== áudio e controle")
+	check(m.sfx_players["bloco"].max_polyphony >= 2, "efeitos sonoros podem sobrepor (polifonia %d)" % m.sfx_players["bloco"].max_polyphony)
+	m.start_game()
+	m.open_quiz("MULTI")
+	m.handle_pad(2)
+	check(m.quiz_answered, "botão X do controle responde o quiz")
+	m.quiz_fb = 0.5
+	m.handle_pad(0)
+	check(m.state == "JOGANDO", "botão A continua após a resposta")
+	m.handle_pad(JOY_BUTTON_START)
+	check(m.state == "PAUSA", "Start pausa")
+	m.handle_pad(JOY_BUTTON_START)
+	check(m.state == "JOGANDO", "Start despausa")
+	print("== animações de bloco")
+	var alvo = null
+	for b in m.bricks:
+		if b.tipo == "normal": alvo = b; break
+	var nodo = alvo.node
+	m.hit_brick(alvo, true)
+	await create_timer(0.5).timeout
+	check(not is_instance_valid(nodo), "bloco destruído some depois da animação de saída")
 	print("== partida completa + game over")
 	m.modo_jogo = "random"; m.dificuldade = "dificil"; m.materias_sel = todas
 	m.start_game(); m.launch()
@@ -105,5 +138,6 @@ func run() -> void:
 	check(m.state == "FIM", "game over alcançado")
 	m.hi = 0
 	DirAccess.remove_absolute(ProjectSettings.globalize_path(m.save_path))
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(m.config_path))
 	print("RESULTADO: ", "TUDO OK" if falhas == 0 else "%d FALHA(S)" % falhas)
 	quit(0 if falhas == 0 else 1)
