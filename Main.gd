@@ -29,6 +29,7 @@ const QUESTIONS_PATH := "res://data/perguntas.json"
 const CONFIG_PATH := "user://config_breakout.cfg"
 const QuizBankScript := preload("res://quiz_bank.gd")
 const LevelGenScript := preload("res://level_gen.gd")
+const GfxScript := preload("res://graphics.gd")
 const ROW_PTS := [7, 7, 5, 5, 3, 3, 1, 1]
 const MATERIAS := ["Matemática", "Geografia", "Ciências", "História", "Cultura"]
 var ROW_COLORS: Array[Color] = [
@@ -65,7 +66,7 @@ var world: Node3D
 var scenery: Node3D
 var cam: Camera3D
 var paddle: MeshInstance3D
-var paddle_mat: StandardMaterial3D
+var paddle_mat: ShaderMaterial
 var ball_light: OmniLight3D
 var emit_nodes: Array = []
 
@@ -97,6 +98,23 @@ var save_path := SAVE_PATH
 var config_path := CONFIG_PATH
 var sound_on := true
 var bump_tw: Tween
+var gfx
+var wall_nodes: Array = []
+var brick_mesh_cache: Dictionary = {}
+var ui_theme: Theme
+var hud_root: Control
+var score_label: Label
+var hi_label: Label
+var level_label: Label
+var quizstat_label: Label
+var hearts: Array = []
+var pill_row: HBoxContainer
+var pills: Dictionary = {}
+var shown_score := 0.0
+var cam_smooth := Vector3.ZERO
+var look_smooth := Vector3(0, -1.2, 0)
+var menu_buttons: Array = []
+var menu_refocus := -1
 var bank
 var drop_cd := 0.0
 var stall_t := 0.0
@@ -118,7 +136,6 @@ var quiz_total := 15.0
 var quiz_answered := false
 var quiz_fb := 0.0
 
-var hud_label: Label
 var msg_label: Label
 var hint_label: Label
 var quiz_box: CenterContainer
@@ -143,11 +160,13 @@ func _ready() -> void:
 	bank = QuizBankScript.new()
 	bank.load_json(QUESTIONS_PATH)
 	setup_input()
+	gfx = GfxScript.new()
 	load_config()
 	setup_sfx()
 	setup_env()
 	setup_world()
 	build_ui()
+	apply_gfx()
 	stats = {"total": 0, "acertos": 0, "por_cat": {}, "tempo": 0.0}
 	set_state("MENU")
 
@@ -231,34 +250,19 @@ func box(size: Vector3, c: Color, pos: Vector3, emis := 0.0, parent: Node = null
 
 
 func setup_env() -> void:
-	var we := WorldEnvironment.new()
-	var env := Environment.new()
-	env.background_mode = Environment.BG_COLOR
-	env.background_color = Color8(10, 10, 26)
-	env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
-	env.ambient_light_color = Color8(140, 140, 190)
-	env.ambient_light_energy = 0.7
-	env.glow_enabled = true
-	we.environment = env
-	add_child(we)
-
+	gfx.build_environment(self)
 	cam = Camera3D.new()
 	cam.fov = 48.0
 	cam.position = Vector3(0, -11.5, 27)
 	add_child(cam)
 	cam.look_at(Vector3(0, -1.2, 0), Vector3.UP)
 	cam_base = cam.position
-
-	var sun := DirectionalLight3D.new()
-	sun.rotation_degrees = Vector3(-28, 18, 0)
-	sun.light_energy = 1.0
-	sun.shadow_enabled = true
-	sun.directional_shadow_max_distance = 70.0
-	add_child(sun)
+	cam_smooth = cam_base
 
 	ball_light = OmniLight3D.new()
 	ball_light.omni_range = 10.0
 	ball_light.light_energy = 1.2
+	ball_light.light_color = Color(1.0, 0.85, 0.6)
 	ball_light.position = Vector3(0, PADDLE_Y, 3)
 	add_child(ball_light)
 
@@ -271,39 +275,44 @@ func setup_world() -> void:
 
 	var floor_mesh := MeshInstance3D.new()
 	var q := QuadMesh.new()
-	q.size = Vector2(HALF_W * 2.0 + 6.0, 28.0)
+	q.size = Vector2(HALF_W * 2.0 + 1.4, 23.2)
 	floor_mesh.mesh = q
-	floor_mesh.material_override = mat(Color8(22, 14, 44))
-	floor_mesh.position = Vector3(0, -0.5, -0.6)
+	floor_mesh.material_override = gfx.floor_mat
+	floor_mesh.position = Vector3(0, -0.45, -0.6)
+	floor_mesh.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	scenery.add_child(floor_mesh)
 
-	# grade do fundo
-	var im := ImmediateMesh.new()
-	im.surface_begin(Mesh.PRIMITIVE_LINES)
-	for i in range(-14, 15, 2):
-		im.surface_add_vertex(Vector3(i, BOTTOM_Y, -0.55))
-		im.surface_add_vertex(Vector3(i, TOP_Y, -0.55))
-	for j in range(-10, 11, 2):
-		im.surface_add_vertex(Vector3(-HALF_W, j, -0.55))
-		im.surface_add_vertex(Vector3(HALF_W, j, -0.55))
-	im.surface_end()
-	var grid := MeshInstance3D.new()
-	grid.mesh = im
-	var gm := StandardMaterial3D.new()
-	gm.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	gm.albedo_color = Color8(45, 40, 90)
-	grid.material_override = gm
-	scenery.add_child(grid)
+	wall_nodes.clear()
+	var specs := [
+		[Vector3(0.6, 22.6, 1.2), Vector3(-HALF_W - 0.3, -0.5, 0)],
+		[Vector3(0.6, 22.6, 1.2), Vector3(HALF_W + 0.3, -0.5, 0)],
+		[Vector3(HALF_W * 2.0 + 1.2, 0.6, 1.2), Vector3(0, TOP_Y + 0.3, 0)]]
+	for sp in specs:
+		var w := MeshInstance3D.new()
+		var bm := BoxMesh.new()
+		bm.size = sp[0]
+		w.mesh = bm
+		w.material_override = gfx.neon_mat
+		w.position = sp[1]
+		scenery.add_child(w)
+		wall_nodes.append(w)
 
-	var wall_c := Color8(70, 70, 140)
-	box(Vector3(0.6, 22.0, 1.2), wall_c, Vector3(-HALF_W - 0.3, -0.75, 0), 0.4, scenery)
-	box(Vector3(0.6, 22.0, 1.2), wall_c, Vector3(HALF_W + 0.3, -0.75, 0), 0.4, scenery)
-	box(Vector3(HALF_W * 2.0 + 1.2, 0.6, 1.2), wall_c, Vector3(0, TOP_Y + 0.3, 0), 0.4, scenery)
-
-	paddle = box(Vector3(PADDLE_BASE_W, PADDLE_H, 0.8), Color8(90, 200, 255), Vector3(0, PADDLE_Y, 0), 0.35)
-	paddle_mat = paddle.material_override
+	paddle = MeshInstance3D.new()
+	var pm := BoxMesh.new()
+	pm.size = Vector3(PADDLE_BASE_W, PADDLE_H, 0.8)
+	paddle.mesh = pm
+	paddle_mat = gfx.new_paddle_mat()
+	paddle.material_override = paddle_mat
+	paddle.position = Vector3(0, PADDLE_Y, 0)
+	world.add_child(paddle)
+	var pl := OmniLight3D.new()
+	pl.light_color = Color(0.4, 0.8, 1.0)
+	pl.light_energy = 1.0
+	pl.omni_range = 7.0
+	pl.position = Vector3(0, 0.4, 1.6)
+	paddle.add_child(pl)
 	for i in 2:
-		emit_nodes.append(box(Vector3(0.18, 0.3, 0.3), Color8(255, 70, 70), Vector3(0, PADDLE_Y + 0.35, 0), 1.5))
+		emit_nodes.append(box(Vector3(0.18, 0.3, 0.3), Color8(255, 70, 70), Vector3(0, PADDLE_Y + 0.35, 0), 2.5))
 		(emit_nodes[i] as MeshInstance3D).visible = false
 
 
@@ -314,10 +323,18 @@ func new_ball(pos: Vector2, vel: Vector2, stuck: bool) -> Dictionary:
 	sm.radius = BALL_R
 	sm.height = BALL_R * 2.0
 	mi.mesh = sm
-	var bmat := mat(Color8(255, 240, 200), 1.2)
+	var bmat := mat(Color8(255, 240, 200), 3.0)
 	mi.material_override = bmat
 	world.add_child(mi)
-	var tmat := mat(Color8(90, 130, 220), 1.0)
+	var hmat: StandardMaterial3D = gfx.halo_material(Color(1.0, 0.85, 0.55, 0.5))
+	var halo := MeshInstance3D.new()
+	var hq := QuadMesh.new()
+	hq.size = Vector2(2.8, 2.8)
+	halo.mesh = hq
+	halo.material_override = hmat
+	halo.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	mi.add_child(halo)
+	var tmat := mat(Color8(90, 130, 220), 2.2)
 	var trail: Array = []
 	for i in 8:
 		var tn := MeshInstance3D.new()
@@ -327,7 +344,7 @@ func new_ball(pos: Vector2, vel: Vector2, stuck: bool) -> Dictionary:
 		tn.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		world.add_child(tn)
 		trail.append(tn)
-	return {"node": mi, "mat": bmat, "tmat": tmat, "trail": trail, "hist": [],
+	return {"node": mi, "mat": bmat, "tmat": tmat, "hmat": hmat, "trail": trail, "hist": [],
 		"pos": pos, "vel": vel, "stuck": stuck, "off": 0.0}
 
 
@@ -387,25 +404,47 @@ func fix_speed(v: Vector2, sp: float) -> Vector2:
 
 
 # ---------------------------------------------------------------- blocos
+func brick_mesh(size: Vector3) -> BoxMesh:
+	if not brick_mesh_cache.has(size):
+		var bm := BoxMesh.new()
+		bm.size = size
+		brick_mesh_cache[size] = bm
+	return brick_mesh_cache[size]
+
+
 func add_brick(tipo: String, pos: Vector2, r: int, hp: int) -> void:
-	var node: MeshInstance3D
 	var col := ROW_COLORS[r]
+	var depth := 0.8
+	var kind := 0.0
 	if tipo == "obstaculo":
 		col = Color8(105, 112, 128)
-		node = box(Vector3(BR_W, BR_H, 1.0), col, Vector3(pos.x, pos.y, 0), 0.1)
+		depth = 1.0
+		kind = 1.0
 	elif tipo == "bomba":
 		col = Color8(155, 45, 42)
-		node = box(Vector3(BR_W, BR_H, 0.8), col, Vector3(pos.x, pos.y, 0), 0.5)
+		kind = 2.0
+	var node := MeshInstance3D.new()
+	node.mesh = brick_mesh(Vector3(BR_W, BR_H, depth))
+	node.material_override = gfx.brick_mat
+	node.position = Vector3(pos.x, pos.y, 0)
+	world.add_child(node)
+	node.set_instance_shader_parameter("base_color", col)
+	node.set_instance_shader_parameter("kind", kind)
+	node.set_instance_shader_parameter("half_size", Vector3(BR_W, BR_H, depth) * 0.5)
+	if tipo == "bomba":
 		var sm := SphereMesh.new()
 		sm.radius = 0.25
 		sm.height = 0.5
 		var core := MeshInstance3D.new()
 		core.mesh = sm
-		core.material_override = mat(Color8(255, 205, 85), 2.0)
+		core.material_override = mat(Color8(255, 205, 85), 3.0)
 		core.position = Vector3(0, 0, 0.5)
 		node.add_child(core)
-	else:
-		node = box(Vector3(BR_W, BR_H, 0.8), col, Vector3(pos.x, pos.y, 0), 0.15)
+	# animação de entrada em onda
+	node.scale = Vector3.ZERO
+	var tw := node.create_tween()
+	tw.tween_interval(r * 0.05 + (pos.x + HALF_W) * 0.012)
+	tw.tween_property(node, "scale", Vector3.ONE, 0.35).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 	var br := {"node": node, "pos": pos, "hp": hp, "max": hp, "pts": ROW_PTS[r] if tipo == "normal" else 0,
 		"color": col, "tipo": tipo}
 	bricks.append(br)
@@ -415,9 +454,8 @@ func add_brick(tipo: String, pos: Vector2, r: int, hp: int) -> void:
 func tint(br: Dictionary) -> void:
 	if br.tipo != "normal":
 		return
-	var base: Color = br.color
-	var m: StandardMaterial3D = br.node.material_override
-	m.albedo_color = base.lerp(Color(0.85, 0.85, 0.9), 0.35 * (int(br.hp) - 1))
+	var n: MeshInstance3D = br.node
+	n.set_instance_shader_parameter("hp_glow", clampf((int(br.hp) - 1) / 3.0, 0.0, 1.0))
 
 
 func build_bricks() -> void:
@@ -453,6 +491,7 @@ func load_level() -> void:
 
 func start_game() -> void:
 	save_config()
+	shown_score = 0.0
 	score = 0
 	lives = 3
 	level = 1
@@ -470,6 +509,8 @@ func start_game() -> void:
 func lose_life() -> void:
 	lives -= 1
 	shake = 0.6
+	shockwave(Vector3(paddle.position.x, PADDLE_Y, 0.5), Color(1.0, 0.3, 0.3), 11.0)
+	floor_ripple(Vector2(paddle.position.x, PADDLE_Y), 1.6)
 	sfx_play("vida")
 	active.clear()
 	clear_dynamic()
@@ -490,22 +531,14 @@ func finish_game() -> void:
 func load_hi() -> int:
 	if FileAccess.file_exists(save_path):
 		var f := FileAccess.open(save_path, FileAccess.READ)
-		if f == null:
-			push_warning("Não foi possível abrir o arquivo de recorde: %s" % save_path)
-			return 0
-		var value := f.get_as_text().strip_edges()
-		if value.is_valid_int():
-			return maxi(0, value.to_int())
-		push_warning("Arquivo de recorde inválido; usando 0: %s" % save_path)
+		return int(f.get_as_text().strip_edges())
 	return 0
 
 
 func save_hi() -> void:
 	var f := FileAccess.open(save_path, FileAccess.WRITE)
-	if f == null:
-		push_warning("Não foi possível salvar o recorde: %s" % save_path)
-		return
-	f.store_string(str(hi))
+	if f:
+		f.store_string(str(hi))
 
 
 # ---------------------------------------------------------------- acertos / bombas
@@ -534,6 +567,7 @@ func hit_brick(br: Dictionary, destroy := false) -> void:
 	burst(node.position, col, 12)
 	pop_brick(node)
 	shake = maxf(shake, 0.08)
+	floor_ripple(p, 0.6)
 	if drop_cd <= 0.0 and randf() < DROP_CHANCE and drops.size() < MAX_DROPS:
 		drop_cd = DROP_COOLDOWN
 		spawn_drop(p)
@@ -554,6 +588,8 @@ func explode_bomb(b0: Dictionary) -> void:
 			burst(Vector3(cp.x, cp.y, 0), palette[i], 9)
 		float_text("BOOM!", Vector3(cp.x, cp.y, 1.0), Color8(255, 150, 60))
 		shake = maxf(shake, 0.5)
+		shockwave(Vector3(cp.x, cp.y, 0.3), Color(1.0, 0.6, 0.2), 9.0)
+		floor_ripple(cp, 1.5)
 		for nb in bricks.duplicate():
 			var np: Vector2 = nb.pos
 			if cp.distance_to(np) > 2.3:
@@ -661,14 +697,17 @@ func step_ball(b: Dictionary, dt: float) -> bool:
 			pos.x = -HALF_W + BALL_R
 			vel.x = absf(vel.x)
 			sfx_play("parede")
+			wall_pulse(0)
 		elif pos.x > HALF_W - BALL_R:
 			pos.x = HALF_W - BALL_R
 			vel.x = -absf(vel.x)
 			sfx_play("parede")
+			wall_pulse(1)
 		if pos.y > TOP_Y - BALL_R:
 			pos.y = TOP_Y - BALL_R
 			vel.y = -absf(vel.y)
 			sfx_play("parede")
+			wall_pulse(2)
 
 		var hits: Array = []
 		for br in bricks:
@@ -719,6 +758,7 @@ func step_ball(b: Dictionary, dt: float) -> bool:
 			accel = minf(1.3, accel + 0.01)
 			sfx_play("raquete")
 			paddle_bump()
+			floor_ripple(Vector2(pos.x, pos.y), 0.5)
 			if active.has("IMA"):
 				b.stuck = true
 				b.off = pos.x - paddle.position.x
@@ -752,17 +792,13 @@ func update_lasers(delta: float) -> void:
 		l.pos = p
 		var n: MeshInstance3D = l.node
 		n.position = Vector3(p.x, p.y, 0)
-		var target: Dictionary = {}
-		var target_distance := INF
+		var target = null
 		for br in bricks:
 			var bp: Vector2 = br.pos
-			var vertical_distance := absf(p.y - bp.y)
-			if absf(p.x - bp.x) < BR_W * 0.5 + 0.045 \
-					and vertical_distance < BR_H * 0.5 + 0.15 \
-					and vertical_distance < target_distance:
+			if absf(p.x - bp.x) < BR_W * 0.5 + 0.045 and absf(p.y - bp.y) < BR_H * 0.5 + 0.15:
 				target = br
-				target_distance = vertical_distance
-		if not target.is_empty():
+				break
+		if target != null:
 			hit_brick(target)
 			n.queue_free()
 			lasers.erase(l)
@@ -792,8 +828,7 @@ func update_paddle(delta: float) -> void:
 	if active.has("IMA"):
 		var ic: Color = BOOSTS["IMA"].cor
 		cor = ic
-	paddle_mat.albedo_color = cor
-	paddle_mat.emission = cor
+	paddle_mat.set_shader_parameter("color", cor)
 	var half := paddle_w * 0.5 - 0.18
 	for i in 2:
 		var en: MeshInstance3D = emit_nodes[i]
@@ -815,6 +850,9 @@ func update_drops(delta: float) -> void:
 			var tipo: String = d.tipo
 			drops.erase(d)
 			n.queue_free()
+			var binfo: Dictionary = BOOSTS[tipo]
+			shockwave(Vector3(p.x, p.y, 0.3), binfo.cor, 5.5)
+			floor_ripple(p, 1.0)
 			open_quiz(tipo)
 			return
 		elif p.y < BOTTOM_Y - 1.0:
@@ -940,7 +978,7 @@ func apply_boost(tipo: String) -> void:
 func set_state(s: String) -> void:
 	state = s
 	world.visible = s in ["JOGANDO", "QUIZ", "PAUSA", "NIVEL"]
-	menu_box.visible = s in ["MENU", "AJUDA", "SELECAO_MODO", "SELECAO_DIFICULDADE", "SELECAO_QUIZ"]
+	menu_box.visible = s in ["MENU", "AJUDA", "GRAFICOS", "SELECAO_MODO", "SELECAO_DIFICULDADE", "SELECAO_QUIZ"]
 	var a := 0.0
 	match s:
 		"QUIZ":
@@ -949,8 +987,8 @@ func set_state(s: String) -> void:
 			a = 0.55
 		"FIM":
 			a = 0.7
-		"MENU", "AJUDA", "SELECAO_MODO", "SELECAO_DIFICULDADE", "SELECAO_QUIZ":
-			a = 0.55
+		"MENU", "AJUDA", "GRAFICOS", "SELECAO_MODO", "SELECAO_DIFICULDADE", "SELECAO_QUIZ":
+			a = 0.45
 	dim_rect.color.a = a
 	quiz_box.visible = s == "QUIZ"
 	if menu_box.visible:
@@ -962,7 +1000,8 @@ func _process(delta: float) -> void:
 	t_anim += delta
 	update_shake(delta)
 	update_fx(delta)
-	update_hud()
+	update_floor_fx()
+	update_hud(delta)
 	match state:
 		"QUIZ":
 			if not quiz_answered:
@@ -1037,6 +1076,8 @@ func update_game(delta: float) -> void:
 		var tm: StandardMaterial3D = b.tmat
 		tm.albedo_color = Color8(255, 130, 40) if fire else Color8(90, 130, 220)
 		tm.emission = tm.albedo_color
+		var hm: StandardMaterial3D = b.hmat
+		hm.albedo_color = Color(1.0, 0.5, 0.15, 0.6) if fire else Color(1.0, 0.85, 0.55, 0.5)
 		var n: int = b.hist.size()
 		for i in 8:
 			var tn: MeshInstance3D = b.trail[i]
@@ -1076,19 +1117,28 @@ func update_game(delta: float) -> void:
 		save_hi()
 		level_timer = 2.5
 		sfx_play("nivel")
+		shockwave(Vector3(0, 0, 0.5), Color(1.0, 0.9, 0.4), 30.0)
+		floor_ripple(Vector2(0, 0), 2.0)
 		set_state("NIVEL")
 
 
 # ---------------------------------------------------------------- HUD
-func update_hud() -> void:
+func update_hud(delta: float) -> void:
 	var show_hud := state in ["JOGANDO", "QUIZ", "PAUSA", "NIVEL"]
-	hud_label.visible = show_hud
-	var boosts := ""
-	for k in active:
-		var info: Dictionary = BOOSTS[k] if BOOSTS.has(k) else DOWNGRADES[k]
-		boosts += "   [%s %ds]" % [info.nome, int(ceil(float(active[k])))]
-	hud_label.text = "PONTOS %06d   RECORDE %06d   NÍVEL %d\nVIDAS %d   QUIZ %d/%d%s" % [
-		score, maxi(hi, score), level, lives, int(stats.get("acertos", 0)), int(stats.get("total", 0)), boosts]
+	hud_root.visible = show_hud
+	shown_score = lerpf(shown_score, float(score), minf(1.0, delta * 8.0))
+	if absf(shown_score - score) < 0.6:
+		shown_score = float(score)
+	score_label.text = "%06d" % int(round(shown_score))
+	hi_label.text = "RECORDE  %06d" % maxi(hi, score)
+	level_label.text = "NÍVEL %d" % level
+	quizstat_label.text = "QUIZ  %d/%d" % [int(stats.get("acertos", 0)), int(stats.get("total", 0))]
+	for i in hearts.size():
+		var h: Node2D = hearts[i]
+		h.visible = i < lives
+		var sc := 1.0 + 0.07 * sin(t_anim * 6.0 + i)
+		h.scale = Vector2(sc, sc)
+	update_pills()
 
 	var hint := ""
 	if state == "JOGANDO":
@@ -1150,7 +1200,13 @@ func make_label(size: int) -> Label:
 
 
 func build_ui() -> void:
+	var fxl := CanvasLayer.new()
+	fxl.layer = 1
+	add_child(fxl)
+	gfx.build_post(fxl)
+
 	var cl := CanvasLayer.new()
+	cl.layer = 2
 	add_child(cl)
 
 	dim_rect = ColorRect.new()
@@ -1159,9 +1215,7 @@ func build_ui() -> void:
 	cl.add_child(dim_rect)
 	dim_rect.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 
-	hud_label = make_label(22)
-	hud_label.position = Vector2(20, 12)
-	cl.add_child(hud_label)
+	build_hud(cl)
 
 	msg_label = make_label(30)
 	msg_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -1247,6 +1301,9 @@ func build_ui() -> void:
 	menu_vb = VBoxContainer.new()
 	menu_vb.add_theme_constant_override("separation", 7)
 	mmg.add_child(menu_vb)
+	ui_theme = build_theme()
+	menu_box.theme = ui_theme
+	quiz_box.theme = ui_theme
 
 
 func mlabel(text: String, size := 18, color := Color.WHITE) -> Label:
@@ -1267,6 +1324,7 @@ func mbutton(text: String, cb: Callable, w := 380.0) -> Button:
 	b.add_theme_font_size_override("font_size", 21)
 	b.pressed.connect(cb)
 	menu_vb.add_child(b)
+	menu_buttons.append(b)
 	return b
 
 
@@ -1283,6 +1341,7 @@ func rebuild_menu() -> void:
 		menu_vb.remove_child(ch)
 		ch.queue_free()
 	quiz_checks.clear()
+	menu_buttons.clear()
 	var cyan := Color8(150, 210, 255)
 	var gold := Color8(255, 220, 120)
 	var grey := Color8(150, 150, 170)
@@ -1298,6 +1357,7 @@ func rebuild_menu() -> void:
 			mlabel("", 8)
 			var jb := mbutton("JOGAR", func(): set_state("SELECAO_MODO"), 280.0)
 			mbutton("COMO JOGAR", func(): set_state("AJUDA"), 280.0)
+			mbutton("GRÁFICOS", func(): set_state("GRAFICOS"), 280.0)
 			mbutton("SOM: " + ("LIGADO" if sound_on else "DESLIGADO"), toggle_sound, 280.0)
 			mlabel("← → / A D / mouse: mover  •  ESPAÇO: lançar / laser  •  P: pausa  •  F11: tela cheia", 15, grey)
 			jb.grab_focus()
@@ -1323,6 +1383,21 @@ func rebuild_menu() -> void:
 			mlabel("Blocos cinza = obstáculos indestrutíveis  •  Blocos vermelhos = bombas (explosão em cadeia)", 15, grey)
 			mlabel("Mover: ← → / A D / mouse / direcional  •  Lançar e atirar: ESPAÇO / botão A  •  Responder: 1-4 ou A/B/X/Y  •  Pausa: P ou Start", 15, grey)
 			mbutton("VOLTAR", func(): set_state("MENU"), 240.0).grab_focus()
+		"GRAFICOS":
+			mlabel("GRÁFICOS", 36, gold)
+			mlabel(GfxScript.QUALITY_DESC[gfx.quality], 16, grey)
+			var r: Vector2i = GfxScript.RESOLUTIONS[gfx.res_idx]
+			mbutton("QUALIDADE: " + GfxScript.QUALITY_NAMES[gfx.quality], func(): gfx_change("quality"), 480.0)
+			mbutton("RESOLUÇÃO DA JANELA: %dx%d" % [r.x, r.y], func(): gfx_change("res"), 480.0)
+			mbutton("TELA CHEIA: " + ("SIM" if gfx.fullscreen else "NÃO"), func(): gfx_change("full"), 480.0)
+			mbutton("ESCALA 3D: %d%%" % int(float(GfxScript.SCALES[gfx.scale_idx]) * 100.0), func(): gfx_change("scale"), 480.0)
+			mbutton("EFEITOS DE TELA: " + ("LIGADOS" if gfx.post else "DESLIGADOS"), func(): gfx_change("post"), 480.0)
+			mlabel(gfx.render_info(get_window()), 16, cyan)
+			mlabel("Escala acima de 100% renderiza em resolução maior e reduz (supersampling): bordas mais nítidas, exige mais da placa de vídeo.", 14, grey)
+			mbutton("VOLTAR", func(): set_state("MENU"), 260.0)
+			var fi := menu_refocus if menu_refocus >= 0 and menu_refocus < menu_buttons.size() else 0
+			(menu_buttons[fi] as Button).grab_focus()
+			menu_refocus = -1
 		"SELECAO_MODO":
 			mlabel("ESCOLHA O MODO DE JOGO", 30)
 			var b1 := mbutton("1)  Padrão — fases clássicas em sequência", func(): choose_modo("padrao"))
@@ -1436,7 +1511,7 @@ func _input(event: InputEvent) -> void:
 		"MENU":
 			if k == KEY_ESCAPE:
 				get_tree().quit()
-		"AJUDA":
+		"AJUDA", "GRAFICOS":
 			if k == KEY_ESCAPE:
 				set_state("MENU")
 		"SELECAO_MODO":
@@ -1510,7 +1585,19 @@ func add_input(nome: String, keys: Array, axis := -1, axis_val := 0.0, btn := -1
 
 func update_shake(delta: float) -> void:
 	shake = maxf(0.0, shake - delta * 2.5)
-	cam.position = cam_base + Vector3(randf_range(-1.0, 1.0), randf_range(-1.0, 1.0), 0.0) * shake * 0.35
+	var sway := Vector3.ZERO
+	var look := Vector3(0, -1.2, 0)
+	if state in ["JOGANDO", "QUIZ", "PAUSA", "NIVEL"]:
+		sway.x = paddle.position.x * 0.12
+		look.x = paddle.position.x * 0.06
+	else:
+		sway = Vector3(sin(t_anim * 0.25) * 3.5, cos(t_anim * 0.2) * 1.2, sin(t_anim * 0.18) * 2.0)
+	var k := 1.0 - exp(-delta * 4.0)
+	cam_smooth = cam_smooth.lerp(cam_base + sway, k)
+	look_smooth = look_smooth.lerp(look, k)
+	cam.position = cam_smooth + Vector3(randf_range(-1.0, 1.0), randf_range(-1.0, 1.0), 0.0) * shake * 0.35
+	cam.look_at(look_smooth, Vector3.UP)
+	cam.fov = 48.0 + shake * 3.0
 
 
 func _notification(what: int) -> void:
@@ -1523,29 +1610,31 @@ func _notification(what: int) -> void:
 
 func panel_style() -> StyleBoxFlat:
 	var sb := StyleBoxFlat.new()
-	sb.bg_color = Color8(22, 22, 44, 250)
-	sb.border_color = Color8(100, 140, 210)
+	sb.bg_color = Color8(18, 20, 44, 245)
+	sb.border_color = Color8(100, 140, 230)
 	sb.set_border_width_all(2)
-	sb.set_corner_radius_all(14)
+	sb.set_corner_radius_all(16)
+	sb.shadow_color = Color(0.25, 0.45, 1.0, 0.28)
+	sb.shadow_size = 22
 	return sb
 
 
 func toggle_fullscreen() -> void:
-	var win := get_window()
-	win.mode = Window.MODE_WINDOWED if win.mode == Window.MODE_FULLSCREEN else Window.MODE_FULLSCREEN
+	gfx.fullscreen = not gfx.fullscreen
+	apply_gfx()
+	save_config()
 
 
 # ---------------------------------------------------------------- polimento / config
 func flash_brick(node: MeshInstance3D) -> void:
-	var m: StandardMaterial3D = node.material_override
-	m.emission_enabled = true
-	m.emission_energy_multiplier = 2.5
-	node.create_tween().tween_property(m, "emission_energy_multiplier", 0.15, 0.2)
+	node.create_tween().tween_method(func(v: float): node.set_instance_shader_parameter("flash", v), 1.2, 0.0, 0.25)
 
 
 func pop_brick(node: MeshInstance3D) -> void:
+	node.set_instance_shader_parameter("flash", 1.5)
 	var tw := node.create_tween()
-	tw.tween_property(node, "scale", Vector3.ZERO, 0.15).set_ease(Tween.EASE_IN)
+	tw.tween_property(node, "scale", Vector3.ONE * 1.25, 0.05)
+	tw.tween_property(node, "scale", Vector3.ZERO, 0.12).set_ease(Tween.EASE_IN)
 	tw.tween_callback(node.queue_free)
 
 
@@ -1609,6 +1698,11 @@ func load_config() -> void:
 			materias_sel = ok
 	sound_on = bool(cf.get_value("jogo", "som", true))
 	apply_sound()
+	gfx.quality = clampi(int(cf.get_value("gfx", "qualidade", gfx.quality)), 0, GfxScript.QUALITY_NAMES.size() - 1)
+	gfx.res_idx = clampi(int(cf.get_value("gfx", "resolucao", gfx.res_idx)), 0, GfxScript.RESOLUTIONS.size() - 1)
+	gfx.scale_idx = clampi(int(cf.get_value("gfx", "escala", gfx.scale_idx)), 0, GfxScript.SCALES.size() - 1)
+	gfx.fullscreen = bool(cf.get_value("gfx", "tela_cheia", gfx.fullscreen))
+	gfx.post = bool(cf.get_value("gfx", "efeitos", gfx.post))
 
 
 func save_config() -> void:
@@ -1617,6 +1711,235 @@ func save_config() -> void:
 	cf.set_value("jogo", "dificuldade", dificuldade)
 	cf.set_value("jogo", "materias", materias_sel)
 	cf.set_value("jogo", "som", sound_on)
-	var error := cf.save(config_path)
-	if error != OK:
-		push_warning("Não foi possível salvar as configurações (%s): %s" % [error, config_path])
+	cf.set_value("gfx", "qualidade", gfx.quality)
+	cf.set_value("gfx", "resolucao", gfx.res_idx)
+	cf.set_value("gfx", "escala", gfx.scale_idx)
+	cf.set_value("gfx", "tela_cheia", gfx.fullscreen)
+	cf.set_value("gfx", "efeitos", gfx.post)
+	cf.save(config_path)
+
+
+
+# ---------------------------------------------------------------- gráficos / HUD novo
+func apply_gfx() -> void:
+	gfx.apply(get_viewport(), get_window())
+
+
+func gfx_change(what: String) -> void:
+	match what:
+		"quality":
+			gfx.quality = (gfx.quality + 1) % GfxScript.QUALITY_NAMES.size()
+		"res":
+			gfx.res_idx = (gfx.res_idx + 1) % GfxScript.RESOLUTIONS.size()
+		"full":
+			gfx.fullscreen = not gfx.fullscreen
+		"scale":
+			gfx.scale_idx = (gfx.scale_idx + 1) % GfxScript.SCALES.size()
+		"post":
+			gfx.post = not gfx.post
+	menu_refocus = menu_buttons.find(get_viewport().gui_get_focus_owner())
+	apply_gfx()
+	save_config()
+	call_deferred("rebuild_menu")
+
+
+func update_floor_fx() -> void:
+	var arr := PackedVector4Array()
+	for i in 6:
+		if i < balls.size():
+			var p: Vector2 = balls[i].pos
+			arr.append(Vector4(p.x, p.y, 1.0 if i == 0 else 0.6, 0.0))
+		else:
+			arr.append(Vector4(0, 0, 0, 0))
+	gfx.floor_mat.set_shader_parameter("balls", arr)
+	gfx.floor_mat.set_shader_parameter("game_time", t_anim)
+
+
+func floor_ripple(p: Vector2, strength: float) -> void:
+	gfx.floor_mat.set_shader_parameter("ripple", Vector4(p.x, p.y, t_anim, strength))
+
+
+func wall_pulse(i: int) -> void:
+	if i >= wall_nodes.size():
+		return
+	var w: MeshInstance3D = wall_nodes[i]
+	w.set_instance_shader_parameter("pulse", 1.0)
+	w.create_tween().tween_method(func(v: float): w.set_instance_shader_parameter("pulse", v), 1.0, 0.0, 0.4)
+
+
+func shockwave(pos: Vector3, col: Color, size: float) -> void:
+	var mi := MeshInstance3D.new()
+	var q := QuadMesh.new()
+	q.size = Vector2.ONE
+	mi.mesh = q
+	var m: StandardMaterial3D = gfx.halo_material(Color(col.r, col.g, col.b, 0.9), true)
+	mi.material_override = m
+	mi.position = pos
+	mi.scale = Vector3(0.3, 0.3, 1.0)
+	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	world.add_child(mi)
+	var tw := mi.create_tween().set_parallel(true)
+	tw.tween_property(mi, "scale", Vector3(size, size, 1.0), 0.45).set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_CUBIC)
+	tw.tween_property(m, "albedo_color:a", 0.0, 0.45)
+	tw.chain().tween_callback(mi.queue_free)
+
+
+func heart_polygon(sz: float) -> PackedVector2Array:
+	var pts := PackedVector2Array()
+	for i in 40:
+		var t := TAU * i / 40.0
+		var x := 16.0 * pow(sin(t), 3.0)
+		var y := -(13.0 * cos(t) - 5.0 * cos(2.0 * t) - 2.0 * cos(3.0 * t) - cos(4.0 * t))
+		pts.append(Vector2(x, y) * sz / 17.0)
+	return pts
+
+
+func build_hud(cl: CanvasLayer) -> void:
+	hud_root = Control.new()
+	hud_root.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	cl.add_child(hud_root)
+	hud_root.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+
+	var cap := make_label(15)
+	cap.text = "PONTOS"
+	cap.position = Vector2(26, 8)
+	cap.modulate = Color8(150, 175, 240)
+	hud_root.add_child(cap)
+	score_label = make_label(44)
+	score_label.position = Vector2(24, 20)
+	hud_root.add_child(score_label)
+	hi_label = make_label(16)
+	hi_label.position = Vector2(26, 78)
+	hi_label.modulate = Color8(255, 220, 120)
+	hud_root.add_child(hi_label)
+
+	level_label = make_label(34)
+	level_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	hud_root.add_child(level_label)
+	level_label.set_anchors_and_offsets_preset(Control.PRESET_TOP_WIDE)
+	level_label.offset_top = 8
+	level_label.offset_bottom = 52
+	quizstat_label = make_label(16)
+	quizstat_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	quizstat_label.modulate = Color8(150, 210, 255)
+	hud_root.add_child(quizstat_label)
+	quizstat_label.set_anchors_and_offsets_preset(Control.PRESET_TOP_WIDE)
+	quizstat_label.offset_top = 52
+	quizstat_label.offset_bottom = 76
+
+	var hbox := Control.new()
+	hbox.position = Vector2(1280 - 36, 38)
+	hud_root.add_child(hbox)
+	for i in 9:
+		var h := Node2D.new()
+		h.position = Vector2(-i * 34.0, 0)
+		var back := Polygon2D.new()
+		back.polygon = heart_polygon(14.0 * 1.22)
+		back.color = Color(0.1, 0.0, 0.05, 0.85)
+		h.add_child(back)
+		var front := Polygon2D.new()
+		front.polygon = heart_polygon(14.0)
+		front.color = Color8(255, 85, 125)
+		h.add_child(front)
+		var shine := Polygon2D.new()
+		shine.polygon = heart_polygon(5.0)
+		shine.position = Vector2(-4, -4)
+		shine.color = Color(1, 1, 1, 0.35)
+		h.add_child(shine)
+		hbox.add_child(h)
+		hearts.append(h)
+
+	pill_row = HBoxContainer.new()
+	pill_row.add_theme_constant_override("separation", 8)
+	pill_row.position = Vector2(26, 106)
+	hud_root.add_child(pill_row)
+
+
+func make_pill(k: String) -> Dictionary:
+	var info: Dictionary = BOOSTS[k] if BOOSTS.has(k) else DOWNGRADES[k]
+	var col: Color = info.cor
+	var pc := PanelContainer.new()
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = Color(0.05, 0.06, 0.12, 0.85)
+	sb.border_color = col
+	sb.set_border_width_all(2)
+	sb.set_corner_radius_all(9)
+	sb.content_margin_left = 10
+	sb.content_margin_right = 10
+	sb.content_margin_top = 5
+	sb.content_margin_bottom = 6
+	pc.add_theme_stylebox_override("panel", sb)
+	var vb := VBoxContainer.new()
+	vb.add_theme_constant_override("separation", 3)
+	pc.add_child(vb)
+	var lb := Label.new()
+	lb.add_theme_font_size_override("font_size", 15)
+	lb.add_theme_color_override("font_color", col)
+	vb.add_child(lb)
+	var bar := ProgressBar.new()
+	bar.max_value = 100.0
+	bar.show_percentage = false
+	bar.custom_minimum_size = Vector2(110, 6)
+	var bg := StyleBoxFlat.new()
+	bg.bg_color = Color(1, 1, 1, 0.12)
+	bg.set_corner_radius_all(3)
+	var fill := StyleBoxFlat.new()
+	fill.bg_color = col
+	fill.set_corner_radius_all(3)
+	bar.add_theme_stylebox_override("background", bg)
+	bar.add_theme_stylebox_override("fill", fill)
+	vb.add_child(bar)
+	pill_row.add_child(pc)
+	return {"root": pc, "label": lb, "bar": bar}
+
+
+func update_pills() -> void:
+	for k in active:
+		if not pills.has(k):
+			pills[k] = make_pill(k)
+		var info: Dictionary = BOOSTS[k] if BOOSTS.has(k) else DOWNGRADES[k]
+		var total := maxf(1.0, float(info.dur))
+		var pl: Dictionary = pills[k]
+		(pl.bar as ProgressBar).value = clampf(float(active[k]) / total, 0.0, 1.0) * 100.0
+		(pl.label as Label).text = "%s  %ds" % [info.nome, int(ceil(float(active[k])))]
+	for k in pills.keys():
+		if not active.has(k):
+			(pills[k].root as Node).queue_free()
+			pills.erase(k)
+
+
+func btn_style(bg: Color, border: Color, bw: int) -> StyleBoxFlat:
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = bg
+	sb.border_color = border
+	sb.set_border_width_all(bw)
+	sb.set_corner_radius_all(12)
+	sb.content_margin_left = 18
+	sb.content_margin_right = 18
+	sb.content_margin_top = 8
+	sb.content_margin_bottom = 8
+	sb.shadow_color = Color(0, 0, 0, 0.35)
+	sb.shadow_size = 5
+	sb.shadow_offset = Vector2(0, 2)
+	return sb
+
+
+func build_theme() -> Theme:
+	var th := Theme.new()
+	th.default_font_size = 20
+	th.set_stylebox("normal", "Button", btn_style(Color8(26, 30, 58), Color8(70, 100, 175), 2))
+	th.set_stylebox("hover", "Button", btn_style(Color8(40, 52, 100), Color8(120, 170, 255), 2))
+	th.set_stylebox("pressed", "Button", btn_style(Color8(58, 80, 150), Color8(170, 205, 255), 2))
+	th.set_stylebox("focus", "Button", btn_style(Color8(34, 42, 86), Color8(255, 220, 120), 3))
+	th.set_stylebox("disabled", "Button", btn_style(Color8(24, 26, 40), Color8(60, 64, 90), 1))
+	for c in ["font_color", "font_hover_color", "font_pressed_color", "font_focus_color"]:
+		th.set_color(c, "Button", Color8(228, 234, 255))
+	var pbg := StyleBoxFlat.new()
+	pbg.bg_color = Color(1, 1, 1, 0.1)
+	pbg.set_corner_radius_all(6)
+	var pfill := StyleBoxFlat.new()
+	pfill.bg_color = Color8(110, 170, 255)
+	pfill.set_corner_radius_all(6)
+	th.set_stylebox("background", "ProgressBar", pbg)
+	th.set_stylebox("fill", "ProgressBar", pfill)
+	return th

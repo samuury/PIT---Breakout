@@ -1,5 +1,8 @@
 recorde_breakout_matematico.txt
 .vscode/
 .godot/
+.venv/
 __pycache__/
 *.py[cod]
+APRESENTACAO.md
+APRESENTACAO copy.txt

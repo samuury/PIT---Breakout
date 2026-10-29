@@ -131,6 +131,43 @@ func run() -> void:
 	m.hit_brick(alvo, true)
 	await create_timer(0.5).timeout
 	check(not is_instance_valid(nodo), "bloco destruído some depois da animação de saída")
+	print("== gráficos")
+	var shaders_ok := true
+	for sp in ["sky", "floor", "brick", "neon", "paddle", "post"]:
+		if not (load("res://shaders/%s.gdshader" % sp) is Shader): shaders_ok = false
+	check(shaders_ok, "6 shaders carregam (céu, chão, bloco, neon, raquete, pós-processamento)")
+	m.gfx.quality = 0; m.apply_gfx()
+	check(not m.gfx.env.glow_enabled and not m.gfx.env.ssao_enabled and not m.gfx.sun.shadow_enabled, "BAIXA: sem bloom, SSAO nem sombras")
+	m.gfx.quality = 3; m.apply_gfx()
+	check(m.gfx.env.ssr_enabled and m.gfx.env.ssao_enabled and m.gfx.env.fog_enabled and m.gfx.sun.shadow_enabled, "ULTRA: SSR, SSAO, névoa e sombras")
+	m.gfx.scale_idx = 4; m.apply_gfx()
+	check(is_equal_approx(m.get_viewport().scaling_3d_scale, 2.0), "escala 3D 200% (supersampling) aplicada")
+	m.gfx.scale_idx = 0; m.apply_gfx()
+	check(is_equal_approx(m.get_viewport().scaling_3d_scale, 0.5), "escala 3D 50% aplicada (FSR)")
+	m.gfx.quality = 2; m.gfx.scale_idx = 2; m.apply_gfx()
+	m.gfx.quality = 3; m.gfx.res_idx = 3; m.gfx.scale_idx = 3; m.gfx.post = false; m.save_config()
+	var m3 = load("res://Main.gd").new()
+	m3.save_path = "user://teste_recorde.txt"
+	m3.config_path = "user://teste_config.cfg"
+	root.add_child(m3)
+	await process_frame
+	await process_frame
+	check(m3.gfx.quality == 3 and m3.gfx.res_idx == 3 and m3.gfx.scale_idx == 3 and not m3.gfx.post, "qualidade, resolução, escala e efeitos restaurados ao reabrir")
+	m3.queue_free()
+	m.gfx.quality = 2; m.gfx.res_idx = 2; m.gfx.scale_idx = 2; m.gfx.post = true; m.apply_gfx()
+	print("== HUD")
+	m.start_game()
+	m.lives = 2
+	m.active["LASER"] = 5.0
+	m.update_hud(0.016)
+	var vis := 0
+	for h in m.hearts:
+		if h.visible: vis += 1
+	check(vis == 2 and m.pills.has("LASER"), "HUD: %d corações visíveis e indicador do boost Laser" % vis)
+	m.active.erase("LASER")
+	m.update_hud(0.016)
+	check(not m.pills.has("LASER"), "indicador some quando o boost acaba")
+	m.lives = 3
 	print("== partida completa + game over")
 	m.modo_jogo = "random"; m.dificuldade = "dificil"; m.materias_sel = todas
 	m.start_game(); m.launch()
