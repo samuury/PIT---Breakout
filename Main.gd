@@ -30,6 +30,9 @@ const CONFIG_PATH := "user://config_breakout.cfg"
 const QuizBankScript := preload("res://quiz_bank.gd")
 const LevelGenScript := preload("res://level_gen.gd")
 const GfxScript := preload("res://graphics.gd")
+const MusicScript := preload("res://music.gd")
+const MUSIC_LEVELS := [0.0, 0.35, 0.7, 1.0]
+const MUSIC_NAMES := ["DESLIGADA", "BAIXA", "MÉDIA", "ALTA"]
 const ROW_PTS := [7, 7, 5, 5, 3, 3, 1, 1]
 const MATERIAS := ["Matemática", "Geografia", "Ciências", "História", "Cultura"]
 var ROW_COLORS: Array[Color] = [
@@ -115,6 +118,10 @@ var cam_smooth := Vector3.ZERO
 var look_smooth := Vector3(0, -1.2, 0)
 var menu_buttons: Array = []
 var menu_refocus := -1
+var music
+var music_idx := 2
+var brick_total := 1
+var music_t := 0.0
 var bank
 var drop_cd := 0.0
 var stall_t := 0.0
@@ -163,6 +170,9 @@ func _ready() -> void:
 	gfx = GfxScript.new()
 	load_config()
 	setup_sfx()
+	music = MusicScript.new()
+	add_child(music)
+	music.volume = MUSIC_LEVELS[music_idx]
 	setup_env()
 	setup_world()
 	build_ui()
@@ -486,6 +496,10 @@ func load_level() -> void:
 	freeze = 0.0
 	cooldown_laser = 0.0
 	stall_t = 0.0
+	brick_total = 0
+	for br in bricks:
+		if br.tipo == "normal":
+			brick_total += 1
 	reset_ball()
 
 
@@ -976,6 +990,7 @@ func apply_boost(tipo: String) -> void:
 
 # ---------------------------------------------------------------- loop
 func set_state(s: String) -> void:
+	var prev := state
 	state = s
 	world.visible = s in ["JOGANDO", "QUIZ", "PAUSA", "NIVEL"]
 	menu_box.visible = s in ["MENU", "AJUDA", "GRAFICOS", "SELECAO_MODO", "SELECAO_DIFICULDADE", "SELECAO_QUIZ"]
@@ -993,6 +1008,8 @@ func set_state(s: String) -> void:
 	quiz_box.visible = s == "QUIZ"
 	if menu_box.visible:
 		call_deferred("rebuild_menu")
+	if music != null:
+		music_on_state(prev, s)
 
 
 func _process(delta: float) -> void:
@@ -1027,6 +1044,15 @@ func _process(delta: float) -> void:
 
 func update_game(delta: float) -> void:
 	drop_cd -= delta
+	music_t -= delta
+	if music_t <= 0.0:
+		music_t = 0.35
+		var left := 0
+		for br in bricks:
+			if br.tipo == "normal":
+				left += 1
+		var progress := 1.0 - float(left) / float(maxi(1, brick_total))
+		music.set_layers(not any_stuck(), progress >= 0.35 or level >= 4 or lives == 1)
 	if freeze <= 0.0 and not any_stuck():
 		stall_t += delta
 		if stall_t > STALL_LIMIT:
@@ -1115,7 +1141,7 @@ func update_game(delta: float) -> void:
 		score += level_bonus
 		hi = maxi(hi, score)
 		save_hi()
-		level_timer = 2.5
+		level_timer = 4.0
 		sfx_play("nivel")
 		shockwave(Vector3(0, 0, 0.5), Color(1.0, 0.9, 0.4), 30.0)
 		floor_ripple(Vector2(0, 0), 2.0)
@@ -1358,7 +1384,8 @@ func rebuild_menu() -> void:
 			var jb := mbutton("JOGAR", func(): set_state("SELECAO_MODO"), 280.0)
 			mbutton("COMO JOGAR", func(): set_state("AJUDA"), 280.0)
 			mbutton("GRÁFICOS", func(): set_state("GRAFICOS"), 280.0)
-			mbutton("SOM: " + ("LIGADO" if sound_on else "DESLIGADO"), toggle_sound, 280.0)
+			mbutton_pair("SOM: " + ("LIGADO" if sound_on else "DESLIGADO"), toggle_sound,
+				"MÚSICA: " + MUSIC_NAMES[music_idx], cycle_music)
 			mlabel("← → / A D / mouse: mover  •  ESPAÇO: lançar / laser  •  P: pausa  •  F11: tela cheia", 15, grey)
 			jb.grab_focus()
 		"AJUDA":
@@ -1697,6 +1724,7 @@ func load_config() -> void:
 		if not ok.is_empty():
 			materias_sel = ok
 	sound_on = bool(cf.get_value("jogo", "som", true))
+	music_idx = clampi(int(cf.get_value("jogo", "musica", music_idx)), 0, MUSIC_LEVELS.size() - 1)
 	apply_sound()
 	gfx.quality = clampi(int(cf.get_value("gfx", "qualidade", gfx.quality)), 0, GfxScript.QUALITY_NAMES.size() - 1)
 	gfx.res_idx = clampi(int(cf.get_value("gfx", "resolucao", gfx.res_idx)), 0, GfxScript.RESOLUTIONS.size() - 1)
@@ -1711,6 +1739,7 @@ func save_config() -> void:
 	cf.set_value("jogo", "dificuldade", dificuldade)
 	cf.set_value("jogo", "materias", materias_sel)
 	cf.set_value("jogo", "som", sound_on)
+	cf.set_value("jogo", "musica", music_idx)
 	cf.set_value("gfx", "qualidade", gfx.quality)
 	cf.set_value("gfx", "resolucao", gfx.res_idx)
 	cf.set_value("gfx", "escala", gfx.scale_idx)
@@ -1943,3 +1972,63 @@ func build_theme() -> Theme:
 	th.set_stylebox("background", "ProgressBar", pbg)
 	th.set_stylebox("fill", "ProgressBar", pfill)
 	return th
+
+
+
+# ---------------------------------------------------------------- trilha sonora
+func track_for_level() -> String:
+	return "jogo_%d" % ((level - 1) % 3 + 1)
+
+
+func music_on_state(prev: String, s: String) -> void:
+	match s:
+		"MENU", "AJUDA", "GRAFICOS", "SELECAO_MODO", "SELECAO_DIFICULDADE", "SELECAO_QUIZ":
+			music.duck(false)
+			if prev == "FIM":
+				music.stop_sting()
+			music.play_track("menu")
+		"JOGANDO":
+			if prev == "QUIZ":
+				music.resume_game()
+			elif prev == "PAUSA":
+				music.duck(false)
+			else:
+				if prev != "NIVEL":
+					music.stop_sting()
+				music.duck(false)
+				music.set_layers(false, false)
+				music.play_track(track_for_level())
+		"QUIZ":
+			music.pause_for_quiz()
+			music.play_track("quiz")
+		"PAUSA":
+			music.duck(true)
+		"NIVEL":
+			music.stop_all()
+			music.sting("vitoria")
+		"FIM":
+			music.stop_all()
+			music.sting("derrota")
+			music.play_after_sting("menu")
+
+
+func cycle_music() -> void:
+	music_idx = (music_idx + 1) % MUSIC_LEVELS.size()
+	music.set_volume(MUSIC_LEVELS[music_idx])
+	save_config()
+	call_deferred("rebuild_menu")
+
+
+func mbutton_pair(ta: String, ca: Callable, tb: String, cb: Callable) -> void:
+	var row := HBoxContainer.new()
+	row.alignment = BoxContainer.ALIGNMENT_CENTER
+	row.add_theme_constant_override("separation", 10)
+	menu_vb.add_child(row)
+	for spec in [[ta, ca], [tb, cb]]:
+		var b := Button.new()
+		b.text = spec[0]
+		b.custom_minimum_size = Vector2(235, 46)
+		b.add_theme_font_size_override("font_size", 18)
+		b.pressed.connect(spec[1])
+		row.add_child(b)
+		menu_buttons.append(b)

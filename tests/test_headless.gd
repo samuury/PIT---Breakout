@@ -168,6 +168,68 @@ func run() -> void:
 	m.update_hud(0.016)
 	check(not m.pills.has("LASER"), "indicador some quando o boost acaba")
 	m.lives = 3
+	print("== trilha sonora")
+	if not m.music.available("jogo_1") or not m.music.available("menu"):
+		print("  (músicas ainda não importadas pelo Godot: rode `godot --headless --import` uma vez; pulando)")
+	else:
+		m.start_game()
+		check(m.music.current == "jogo_1" and m.music.group.size() == 4, "início do jogo toca jogo_1 com 4 camadas")
+		check(m.music.layer_on[0] and m.music.layer_on[2] and not m.music.layer_on[1], "bola presa: só base e arpejo (sem bateria)")
+		m.launch()
+		m.music_t = 0.0
+		m.update_game(0.016)
+		check(m.music.layer_on[1], "bola lançada: entra a bateria")
+		m.open_quiz("MULTI")
+		check(m.music.current == "quiz" and not m.music.stash.is_empty(), "quiz troca para a música de tensão e guarda a do jogo")
+		m.answer(m.quiz.correct)
+		m.quiz_fb = 0.5
+		m.close_quiz()
+		check(m.music.current == "jogo_1" and m.music.stash.is_empty() and m.music.group.size() == 4, "após o quiz a música do jogo retoma")
+		var tocando := true
+		for pl in m.music.group:
+			if pl.stream_paused: tocando = false
+		check(tocando, "camadas retomadas sem ficar pausadas")
+		m.set_state("PAUSA")
+		check(m.music.duck_on, "pausa abaixa a música")
+		m.set_state("JOGANDO")
+		check(not m.music.duck_on, "sair da pausa restaura o volume")
+		m.set_state("NIVEL")
+		check(m.music.current == "" and m.music.sting_player.playing, "fim de fase para a faixa e toca a vinheta de vitória")
+		m.level = 2
+		m.set_state("JOGANDO")
+		check(m.music.current == "jogo_2", "fase 2 usa outra faixa (jogo_2)")
+		m.level = 4
+		check(m.track_for_level() == "jogo_1", "as faixas se repetem em ciclo de 3")
+		m.level = 1
+		m.set_state("FIM")
+		check(m.music.sting_player.playing and m.music.after_sting == "menu", "game over toca a vinheta e depois volta ao menu")
+		m.set_state("MENU")
+		check(m.music.current == "menu", "menu toca o tema do menu")
+	m.music_idx = 1; m.music.set_volume(0.35); m.save_config()
+	var m4 = load("res://Main.gd").new()
+	m4.save_path = "user://teste_recorde.txt"
+	m4.config_path = "user://teste_config.cfg"
+	root.add_child(m4)
+	await process_frame
+	await process_frame
+	check(m4.music_idx == 1 and is_equal_approx(m4.music.volume, 0.35), "volume da música restaurado ao reabrir")
+	m4.queue_free()
+	m.music_idx = 2; m.music.set_volume(0.7)
+	if m.music.available("jogo_1"):
+		print("== fades da música (tempo real)")
+		m.start_game()
+		await create_timer(1.6).timeout
+		var base_p = m.music.group[0]
+		var ritmo_p = m.music.group[1]
+		var alvo_db := linear_to_db(0.7)
+		check(absf(base_p.volume_db - alvo_db) < 1.0 and ritmo_p.volume_db < -50.0, "fade-in: base audível (%.1f dB) e bateria ainda muda (%.1f dB)" % [base_p.volume_db, ritmo_p.volume_db])
+		m.launch()
+		await create_timer(1.8).timeout
+		check(absf(ritmo_p.volume_db - alvo_db) < 1.0, "bateria entra com fade depois do lançamento (%.1f dB)" % ritmo_p.volume_db)
+		m.set_state("PAUSA")
+		await create_timer(1.0).timeout
+		check(base_p.volume_db < alvo_db - 10.0, "pausa abaixa o volume com fade (%.1f dB)" % base_p.volume_db)
+		m.set_state("JOGANDO")
 	print("== partida completa + game over")
 	m.modo_jogo = "random"; m.dificuldade = "dificil"; m.materias_sel = todas
 	m.start_game(); m.launch()
