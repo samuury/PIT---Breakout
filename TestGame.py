@@ -6,7 +6,7 @@ Releitura do Breakout (Atari, 1976) com questionários de matemática e conhecim
 
 Como funciona
 -------------
-- Quebre os blocos com a bola, como no Breakout original.
+- Quebre os blocos com a bola, como no  Breakout original.
 - Alguns blocos soltam uma CÁPSULA (drop) com um boost.
 - Ao pegar a cápsula com a raquete, o jogo pausa e sorteia uma questão
   de um dos 10 questionários (Aritmética, Tabuada, Divisão, Porcentagem,
